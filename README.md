@@ -50,3 +50,24 @@ This will:
 - Machine-specific overrides live in [config/user-overrides.json](/Users/sqee/Documents/local-mqtt-app-runner/config/user-overrides.json)
 - Use the `Config` button in the top-right corner to edit ports, interfaces, and process paths
 - Saved overrides are applied the next time the runner starts
+
+## Windows portable packaging
+
+Build a portable Windows bundle with:
+
+```bash
+npm run package:windows
+```
+
+Expected Windows Node runtime location:
+
+- default: [vendor/windows-node-x64](/Users/sqee/Documents/local-mqtt-app-runner/vendor/windows-node-x64)
+- override with env var: `WINDOWS_NODE_RUNTIME_DIR=/path/to/windows-node-runtime`
+
+The packaging script expects that folder to contain `node.exe`.
+
+Output:
+
+- staged bundle folder: [release/windows-x64](/Users/sqee/Documents/local-mqtt-app-runner/release/windows-x64)
+- launcher: `PackageRunner.cmd`
+- zipped artifact: `release/windows-x64.zip` when the local `zip` command is available
