@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "mock-backend": "node scripts/mock-backend.js",
-    "mvp": "npm run build && node scripts/mvp-orchestrator.js"
+    "runner": "npm run build && node scripts/mvp-orchestrator.js"
   },
   "dependencies": {
     "aedes": "^0.51.3",

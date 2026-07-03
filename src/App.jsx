@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
-import mqtt from "mqtt";
+import { useEffect, useRef, useState } from "react";
 import {
   configSections,
   getValueAtPath,
@@ -8,6 +7,8 @@ import {
 } from "./config-fields";
 
 function App() {
+  const frontendWindowRef = useRef(null);
+  const previousRunningRef = useRef(false);
   const [page, setPage] = useState(() =>
     window.location.pathname.startsWith("/config") ? "config" : "home"
   );
@@ -15,9 +16,13 @@ function App() {
   const [formState, setFormState] = useState(null);
   const [configStatus, setConfigStatus] = useState("Loading configuration...");
   const [saveState, setSaveState] = useState("idle");
-  const [mqttStatus, setMqttStatus] = useState("waiting for configuration");
-  const [backendStatus, setBackendStatus] = useState("waiting for message");
-  const [lastMessage, setLastMessage] = useState("No message received yet.");
+  const [runtimeState, setRuntimeState] = useState({
+    isRunning: false,
+    isTransitioning: false,
+    lastError: null
+  });
+  const [runtimeActionState, setRuntimeActionState] = useState("idle");
+  const [copyState, setCopyState] = useState("idle");
 
   useEffect(() => {
     const onPopState = () => {
@@ -49,67 +54,55 @@ function App() {
     loadConfig();
   }, []);
 
-  const mqttUrl = useMemo(() => {
-    if (!configData) {
-      return null;
+  useEffect(() => {
+    async function loadRuntime() {
+      try {
+        const response = await fetch("/api/runtime");
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Failed to load runtime status.");
+        }
+
+        setRuntimeState(payload);
+      } catch (error) {
+        setRuntimeState((current) => ({
+          ...current,
+          lastError: error.message
+        }));
+      }
     }
 
-    return `ws://${configData.effective.interfaces.host}:${configData.effective.ports.mqttWs}`;
-  }, [configData]);
-
-  const testTopic = configData?.effective?.mqtt?.testTopic ?? "mvp/test";
+    loadRuntime();
+    const timer = window.setInterval(loadRuntime, 2000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
-    if (!mqttUrl) {
-      return undefined;
+    const frontendUrl = runtimeState.currentConfig?.frontendAppUrl;
+    const autoOpenFrontend =
+      runtimeState.currentConfig?.runtime?.autoOpenFrontend === true;
+    const wasRunning = previousRunningRef.current;
+
+    if (
+      runtimeState.isRunning &&
+      frontendUrl &&
+      autoOpenFrontend &&
+      !wasRunning &&
+      !frontendWindowRef.current
+    ) {
+      const openedWindow = window.open(frontendUrl, "package-runner-fe");
+      frontendWindowRef.current = openedWindow;
     }
 
-    const client = mqtt.connect(mqttUrl, {
-      reconnectPeriod: 1500,
-      connectTimeout: 4000
-    });
+    previousRunningRef.current = runtimeState.isRunning;
+  }, [runtimeState.isRunning, runtimeState.currentConfig]);
 
-    setMqttStatus("connecting");
-    setBackendStatus("waiting for message");
-    setLastMessage("No message received yet.");
-
-    client.on("connect", () => {
-      setMqttStatus("connected");
-      client.subscribe(testTopic, (error) => {
-        if (error) {
-          setBackendStatus("subscription failed");
-          return;
-        }
-        setBackendStatus("subscribed, waiting for backend");
-      });
-    });
-
-    client.on("reconnect", () => {
-      setMqttStatus("reconnecting");
-    });
-
-    client.on("offline", () => {
-      setMqttStatus("offline");
-    });
-
-    client.on("error", () => {
-      setMqttStatus("failed");
-    });
-
-    client.on("message", (topic, payload) => {
-      if (topic !== testTopic) {
-        return;
-      }
-
-      const content = payload.toString();
-      setBackendStatus("message received");
-      setLastMessage(content);
-    });
-
-    return () => {
-      client.end(true);
-    };
-  }, [mqttUrl, testTopic]);
+  function tryOpenFrontend(url) {
+    const openedWindow = window.open(url, "package-runner-fe");
+    frontendWindowRef.current = openedWindow;
+    return openedWindow;
+  }
 
   function navigate(nextPage) {
     const nextPath = nextPage === "config" ? "/config" : "/";
@@ -119,6 +112,12 @@ function App() {
 
   function handleFieldChange(path, rawValue, type) {
     if (!formState) {
+      return;
+    }
+
+    if (type === "checkbox") {
+      setFormState((current) => setValueAtPath(current, path, rawValue));
+      setSaveState("idle");
       return;
     }
 
@@ -161,6 +160,59 @@ function App() {
     }
   }
 
+  async function toggleRuntime() {
+    const nextAction = runtimeState.isRunning ? "stop" : "start";
+    setRuntimeActionState(nextAction === "start" ? "starting" : "stopping");
+
+    try {
+      const response = await fetch(`/api/runtime/${nextAction}`, {
+        method: "POST"
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? `Failed to ${nextAction} runtime.`);
+      }
+
+      if (
+        nextAction === "start" &&
+        payload.currentConfig?.runtime?.autoOpenFrontend === true &&
+        payload.currentConfig?.frontendAppUrl
+      ) {
+        tryOpenFrontend(payload.currentConfig.frontendAppUrl);
+      }
+
+      if (nextAction === "stop" && frontendWindowRef.current && !frontendWindowRef.current.closed) {
+        frontendWindowRef.current.close();
+        frontendWindowRef.current = null;
+      }
+
+      setRuntimeState(payload);
+      setRuntimeActionState("idle");
+    } catch (error) {
+      setRuntimeActionState(error.message);
+      setRuntimeState((current) => ({
+        ...current,
+        lastError: error.message
+      }));
+    }
+  }
+
+  async function copyFrontendUrl() {
+    if (!runtimeState.currentConfig?.frontendAppUrl) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(runtimeState.currentConfig.frontendAppUrl);
+      setCopyState("copied");
+      window.setTimeout(() => setCopyState("idle"), 1600);
+    } catch {
+      setCopyState("failed");
+      window.setTimeout(() => setCopyState("idle"), 1600);
+    }
+  }
+
   const currentConfigPath = configData?.filePaths?.userConfig ?? "Loading...";
   const defaultConfigPath = configData?.filePaths?.defaultConfig ?? "Loading...";
 
@@ -180,42 +232,101 @@ function App() {
 
       {page === "home" ? (
         <section className="hero-card">
-          <p className="eyebrow">FE Package MVP</p>
-          <h1>Hello World</h1>
+          <p className="eyebrow">Runner control tool</p>
+          <h1>Package Runner</h1>
           <p className="lede">
-            This page is served locally, connects to MQTT on localhost, and shows
-            the latest message from the backend.
+            This runner controls separate FE, BE, and MQTT packages. The frontend
+            package launches on its own port as an injected application.
           </p>
+
+          <div className="runner-actions">
+            <div className="runner-action-row">
+              <button
+                className={runtimeState.isRunning ? "runner-button stop" : "runner-button start"}
+                type="button"
+                onClick={toggleRuntime}
+                disabled={runtimeState.isTransitioning}
+              >
+                {runtimeState.isTransitioning
+                  ? runtimeState.isRunning
+                    ? "Stopping..."
+                    : "Starting..."
+                  : runtimeState.isRunning
+                    ? "Stop"
+                    : "Start"}
+              </button>
+
+              {runtimeState.isRunning && runtimeState.currentConfig?.frontendAppUrl ? (
+                <div className="app-ready">
+                  <span>
+                    App ready at{" "}
+                    <a
+                      href={runtimeState.currentConfig.frontendAppUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {runtimeState.currentConfig.frontendAppUrl}
+                    </a>
+                  </span>
+                  <button
+                    className="copy-button"
+                    type="button"
+                    onClick={copyFrontendUrl}
+                    aria-label="Copy app URL"
+                    title={copyState === "copied" ? "Copied" : "Copy URL"}
+                  >
+                    {copyState === "copied" ? "Copied" : "Copy"}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+            <p className="runner-hint">
+              {runtimeState.lastError
+                ? `Runner error: ${runtimeState.lastError}`
+                : runtimeState.isRunning
+                  ? "Injected FE, BE, and MQTT packages are active."
+                  : "Runner UI is loaded. Press Start to launch FE, BE, and MQTT packages."}
+            </p>
+          </div>
 
           <div className="status-grid">
             <article className="status-card">
-              <h2>Frontend</h2>
-              <p className="status-ok">loaded</p>
-            </article>
-            <article className="status-card">
-              <h2>MQTT</h2>
-              <p className={mqttStatus === "connected" ? "status-ok" : "status-warn"}>
-                {mqttStatus}
-              </p>
-            </article>
-            <article className="status-card">
-              <h2>Backend</h2>
+              <h2>Frontend Package</h2>
               <p
                 className={
-                  backendStatus === "message received"
+                  runtimeState.packageStatus?.fe === "running"
                     ? "status-ok"
                     : "status-warn"
                 }
               >
-                {backendStatus}
+                {runtimeState.packageStatus?.fe ?? "stopped"}
+              </p>
+            </article>
+            <article className="status-card">
+              <h2>MQTT Package</h2>
+              <p
+                className={
+                  runtimeState.packageStatus?.mqtt === "running"
+                    ? "status-ok"
+                    : "status-warn"
+                }
+              >
+                {runtimeState.packageStatus?.mqtt ?? "stopped"}
+              </p>
+            </article>
+            <article className="status-card">
+              <h2>Backend Package</h2>
+              <p
+                className={
+                  runtimeState.packageStatus?.be === "running"
+                    ? "status-ok"
+                    : "status-warn"
+                }
+              >
+                {runtimeState.packageStatus?.be ?? "stopped"}
               </p>
             </article>
           </div>
-
-          <article className="message-card">
-            <h2>Latest Test Message</h2>
-            <pre>{lastMessage}</pre>
-          </article>
         </section>
       ) : (
         <section className="config-card">
@@ -249,23 +360,46 @@ function App() {
                         field.path
                       );
                       const inputValue =
-                        overrideValue === undefined ? "" : String(overrideValue);
+                        field.type === "checkbox"
+                          ? Boolean(
+                              overrideValue === undefined
+                                ? effectiveValue
+                                : overrideValue
+                            )
+                          : overrideValue === undefined
+                            ? ""
+                            : String(overrideValue);
 
                       return (
                         <label className="field-card" key={field.path}>
                           <span>{field.label}</span>
-                          <input
-                            type={field.type}
-                            value={inputValue}
-                            placeholder={field.placeholder ?? String(effectiveValue ?? "")}
-                            onChange={(event) =>
-                              handleFieldChange(
-                                field.path,
-                                event.target.value,
-                                field.type
-                              )
-                            }
-                          />
+                          {field.type === "checkbox" ? (
+                            <input
+                              className="toggle-input"
+                              type="checkbox"
+                              checked={inputValue}
+                              onChange={(event) =>
+                                handleFieldChange(
+                                  field.path,
+                                  event.target.checked,
+                                  field.type
+                                )
+                              }
+                            />
+                          ) : (
+                            <input
+                              type={field.type}
+                              value={inputValue}
+                              placeholder={field.placeholder ?? String(effectiveValue ?? "")}
+                              onChange={(event) =>
+                                handleFieldChange(
+                                  field.path,
+                                  event.target.value,
+                                  field.type
+                                )
+                              }
+                            />
+                          )}
                           <small>Current effective value: {String(effectiveValue ?? "")}</small>
                         </label>
                       );

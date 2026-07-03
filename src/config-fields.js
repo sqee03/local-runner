@@ -16,8 +16,13 @@ export const configSections = [
     description: "Ports the runner uses for the frontend and MQTT services.",
     fields: [
       {
-        path: "ports.frontend",
-        label: "Frontend port",
+        path: "ports.runner",
+        label: "Runner UI port",
+        type: "number"
+      },
+      {
+        path: "ports.frontendPackage",
+        label: "Frontend package port",
         type: "number"
       },
       {
@@ -37,6 +42,24 @@ export const configSections = [
     description: "Executable and file locations needed to run the backend process.",
     fields: [
       {
+        path: "paths.frontendExecutable",
+        label: "Frontend executable path",
+        type: "text",
+        placeholder: "node"
+      },
+      {
+        path: "paths.frontendEntry",
+        label: "Frontend entry path",
+        type: "text",
+        placeholder: "./injections/fe/server.js"
+      },
+      {
+        path: "paths.frontendWorkingDirectory",
+        label: "Frontend working directory",
+        type: "text",
+        placeholder: "."
+      },
+      {
         path: "paths.backendExecutable",
         label: "Backend executable path",
         type: "text",
@@ -53,6 +76,24 @@ export const configSections = [
         label: "Backend working directory",
         type: "text",
         placeholder: "."
+      },
+      {
+        path: "paths.mqttExecutable",
+        label: "MQTT executable path",
+        type: "text",
+        placeholder: "node"
+      },
+      {
+        path: "paths.mqttEntry",
+        label: "MQTT entry path",
+        type: "text",
+        placeholder: "./injections/mqtt/server.js"
+      },
+      {
+        path: "paths.mqttWorkingDirectory",
+        label: "MQTT working directory",
+        type: "text",
+        placeholder: "."
       }
     ]
   },
@@ -65,6 +106,22 @@ export const configSections = [
         label: "Test topic",
         type: "text",
         placeholder: "mvp/test"
+      }
+    ]
+  },
+  {
+    title: "Runtime",
+    description: "Control whether services start automatically when the runner launches.",
+    fields: [
+      {
+        path: "runtime.autoStart",
+        label: "Auto-start runtime on launch",
+        type: "checkbox"
+      },
+      {
+        path: "runtime.autoOpenFrontend",
+        label: "Auto-open frontend tab when runtime starts",
+        type: "checkbox"
       }
     ]
   }

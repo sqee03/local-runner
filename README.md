@@ -24,7 +24,7 @@ npm install
 2. Start the full local runtime:
 
 ```bash
-npm run mvp
+npm run runner
 ```
 
 This will:

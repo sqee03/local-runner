@@ -1,1 +1,6 @@
-{}
+{
+  "runtime": {
+    "autoStart": false,
+    "autoOpenFrontend": false
+  }
+}

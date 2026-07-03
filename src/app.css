@@ -74,6 +74,105 @@ h1 {
   margin-top: 28px;
 }
 
+.runner-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  margin-top: 28px;
+}
+
+.runner-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.runner-button {
+  min-width: 220px;
+  border: 0;
+  border-radius: 999px;
+  padding: 18px 28px;
+  color: #081019;
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    filter 180ms ease;
+  will-change: transform, box-shadow;
+}
+
+.runner-button.start {
+  background: linear-gradient(135deg, #9cf98a 0%, #46d46b 100%);
+  box-shadow: 0 18px 34px rgba(70, 212, 107, 0.26);
+}
+
+.runner-button.stop {
+  background: linear-gradient(135deg, #ff8e7f 0%, #f04141 100%);
+  box-shadow: 0 18px 34px rgba(240, 65, 65, 0.24);
+}
+
+.runner-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: saturate(1.04);
+}
+
+.runner-button.start:hover:not(:disabled) {
+  box-shadow: 0 24px 42px rgba(70, 212, 107, 0.34);
+}
+
+.runner-button.stop:hover:not(:disabled) {
+  box-shadow: 0 24px 42px rgba(240, 65, 65, 0.32);
+}
+
+.runner-button:disabled {
+  cursor: wait;
+  opacity: 0.82;
+}
+
+.runner-hint {
+  margin: 0;
+  color: #d3dce4;
+  line-height: 1.5;
+}
+
+.app-ready {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  color: #d3dce4;
+}
+
+.app-ready a {
+  color: #9fdcff;
+  text-decoration: none;
+}
+
+.app-ready a:hover {
+  text-decoration: underline;
+}
+
+.copy-button {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f2efe8;
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.copy-button:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
 .status-card,
 .message-card {
   padding: 18px;
@@ -193,6 +292,13 @@ h1 {
   background: rgba(3, 10, 16, 0.75);
   color: #f2efe8;
   font: inherit;
+}
+
+.field-card .toggle-input {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  accent-color: #46d46b;
 }
 
 .field-card small {

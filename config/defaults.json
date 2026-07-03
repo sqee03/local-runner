@@ -3,16 +3,27 @@
     "host": "127.0.0.1"
   },
   "ports": {
-    "frontend": 4173,
+    "runner": 4173,
+    "frontendPackage": 4300,
     "mqttTcp": 18883,
     "mqttWs": 19001
   },
   "paths": {
+    "frontendExecutable": "node",
+    "frontendEntry": "./injections/fe/server.js",
+    "frontendWorkingDirectory": ".",
     "backendExecutable": "node",
-    "backendEntry": "./scripts/mock-backend.js",
-    "backendWorkingDirectory": "."
+    "backendEntry": "./injections/be/server.js",
+    "backendWorkingDirectory": ".",
+    "mqttExecutable": "node",
+    "mqttEntry": "./injections/mqtt/server.js",
+    "mqttWorkingDirectory": "."
   },
   "mqtt": {
     "testTopic": "mvp/test"
+  },
+  "runtime": {
+    "autoStart": false,
+    "autoOpenFrontend": false
   }
 }

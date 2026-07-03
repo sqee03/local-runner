@@ -4,13 +4,29 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createConfigStore } from "./config-store.js";
-import { startBroker } from "./mqtt-broker.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const distDir = path.join(projectRoot, "dist");
 const configStore = createConfigStore(projectRoot);
+
+const runtimeState = {
+  isRunning: false,
+  isTransitioning: false,
+  lastError: null,
+  currentConfig: null,
+  packageStatus: {
+    fe: "stopped",
+    be: "stopped",
+    mqtt: "stopped"
+  },
+  packageProcesses: {
+    fe: null,
+    be: null,
+    mqtt: null
+  }
+};
 
 function contentTypeFor(filePath) {
   if (filePath.endsWith(".html")) return "text/html; charset=utf-8";
@@ -58,6 +74,189 @@ function normalizeConfigForClient(configSnapshot) {
   };
 }
 
+function normalizeRuntimeForClient() {
+  return {
+    isRunning: runtimeState.isRunning,
+    isTransitioning: runtimeState.isTransitioning,
+    lastError: runtimeState.lastError,
+    currentConfig: runtimeState.currentConfig,
+    packageStatus: runtimeState.packageStatus
+  };
+}
+
+function openBrowser(url) {
+  if (process.env.NO_OPEN_BROWSER === "1") {
+    return;
+  }
+
+  const platform = process.platform;
+
+  if (platform === "win32") {
+    spawn("cmd", ["/c", "start", "", url], {
+      stdio: "ignore",
+      detached: true
+    }).unref();
+    return;
+  }
+
+  if (platform === "darwin") {
+    spawn("open", [url], { stdio: "ignore", detached: true }).unref();
+    return;
+  }
+
+  spawn("xdg-open", [url], { stdio: "ignore", detached: true }).unref();
+}
+
+function buildPackageRuntimeConfig(configSnapshot) {
+  const effective = configSnapshot.effective;
+  const host = effective.interfaces.host;
+
+  return {
+    host,
+    ports: effective.ports,
+    mqttTopic: effective.mqtt.testTopic,
+    packageDefinitions: {
+      mqtt: {
+        executable:
+          effective.paths.mqttExecutable === "node"
+            ? process.execPath
+            : effective.paths.mqttExecutable,
+        entry: path.resolve(projectRoot, effective.paths.mqttEntry),
+        cwd: path.resolve(projectRoot, effective.paths.mqttWorkingDirectory),
+        env: {
+          ...process.env,
+          MQTT_HOST: host,
+          MQTT_TCP_PORT: String(effective.ports.mqttTcp),
+          MQTT_WS_PORT: String(effective.ports.mqttWs)
+        }
+      },
+      be: {
+        executable:
+          effective.paths.backendExecutable === "node"
+            ? process.execPath
+            : effective.paths.backendExecutable,
+        entry: path.resolve(projectRoot, effective.paths.backendEntry),
+        cwd: path.resolve(projectRoot, effective.paths.backendWorkingDirectory),
+        env: {
+          ...process.env,
+          MQTT_TCP_URL: `mqtt://${host}:${effective.ports.mqttTcp}`,
+          MQTT_TEST_TOPIC: effective.mqtt.testTopic
+        }
+      },
+      fe: {
+        executable:
+          effective.paths.frontendExecutable === "node"
+            ? process.execPath
+            : effective.paths.frontendExecutable,
+        entry: path.resolve(projectRoot, effective.paths.frontendEntry),
+        cwd: path.resolve(projectRoot, effective.paths.frontendWorkingDirectory),
+        env: {
+          ...process.env,
+          FE_HOST: host,
+          FE_PORT: String(effective.ports.frontendPackage),
+          MQTT_WS_PORT: String(effective.ports.mqttWs),
+          MQTT_TEST_TOPIC: effective.mqtt.testTopic
+        }
+      }
+    }
+  };
+}
+
+function attachPackageExitHandler(packageName, childProcess) {
+  childProcess.on("exit", (code) => {
+    runtimeState.packageProcesses[packageName] = null;
+    runtimeState.packageStatus[packageName] = "stopped";
+
+    if (runtimeState.isTransitioning) {
+      return;
+    }
+
+    if (runtimeState.isRunning) {
+      runtimeState.lastError = `${packageName.toUpperCase()} package exited unexpectedly with code ${code ?? "unknown"}.`;
+      runtimeState.isRunning = false;
+      console.error(runtimeState.lastError);
+    }
+  });
+}
+
+function spawnPackage(packageName, definition) {
+  runtimeState.packageStatus[packageName] = "starting";
+  const childProcess = spawn(definition.executable, [definition.entry], {
+    cwd: definition.cwd,
+    stdio: "inherit",
+    env: definition.env
+  });
+
+  runtimeState.packageProcesses[packageName] = childProcess;
+  attachPackageExitHandler(packageName, childProcess);
+  runtimeState.packageStatus[packageName] = "running";
+  return childProcess;
+}
+
+async function stopProcess(packageName) {
+  const childProcess = runtimeState.packageProcesses[packageName];
+  if (!childProcess) {
+    runtimeState.packageStatus[packageName] = "stopped";
+    return;
+  }
+
+  runtimeState.packageProcesses[packageName] = null;
+  runtimeState.packageStatus[packageName] = "stopping";
+  childProcess.kill();
+  await new Promise((resolve) => childProcess.once("exit", resolve));
+  runtimeState.packageStatus[packageName] = "stopped";
+}
+
+async function startRuntime() {
+  if (runtimeState.isRunning) {
+    return normalizeRuntimeForClient();
+  }
+
+  runtimeState.isTransitioning = true;
+  runtimeState.lastError = null;
+
+  const configSnapshot = configStore.readConfig();
+  const packageConfig = buildPackageRuntimeConfig(configSnapshot);
+
+  try {
+    spawnPackage("mqtt", packageConfig.packageDefinitions.mqtt);
+    spawnPackage("be", packageConfig.packageDefinitions.be);
+    spawnPackage("fe", packageConfig.packageDefinitions.fe);
+
+    runtimeState.currentConfig = {
+      ...configSnapshot.effective,
+      frontendAppUrl: `http://${packageConfig.host}:${packageConfig.ports.frontendPackage}`
+    };
+    runtimeState.isRunning = true;
+  } catch (error) {
+    runtimeState.lastError = error.message;
+    await Promise.all(["fe", "be", "mqtt"].map((name) => stopProcess(name).catch(() => {})));
+    throw error;
+  } finally {
+    runtimeState.isTransitioning = false;
+  }
+
+  return normalizeRuntimeForClient();
+}
+
+async function stopRuntime() {
+  if (!runtimeState.isRunning && !runtimeState.isTransitioning) {
+    runtimeState.lastError = null;
+    return normalizeRuntimeForClient();
+  }
+
+  runtimeState.isTransitioning = true;
+  runtimeState.lastError = null;
+  runtimeState.isRunning = false;
+
+  for (const packageName of ["fe", "be", "mqtt"]) {
+    await stopProcess(packageName).catch(() => {});
+  }
+
+  runtimeState.isTransitioning = false;
+  return normalizeRuntimeForClient();
+}
+
 function createStaticServer() {
   return http.createServer((req, res) => {
     const rawPath = req.url?.split("?")[0] ?? "/";
@@ -84,6 +283,25 @@ function createStaticServer() {
       return;
     }
 
+    if (rawPath === "/api/runtime" && req.method === "GET") {
+      sendJson(res, 200, normalizeRuntimeForClient());
+      return;
+    }
+
+    if (rawPath === "/api/runtime/start" && req.method === "POST") {
+      startRuntime()
+        .then((payload) => sendJson(res, 200, payload))
+        .catch((error) => sendJson(res, 500, { error: error.message }));
+      return;
+    }
+
+    if (rawPath === "/api/runtime/stop" && req.method === "POST") {
+      stopRuntime()
+        .then((payload) => sendJson(res, 200, payload))
+        .catch((error) => sendJson(res, 500, { error: error.message }));
+      return;
+    }
+
     const requestPath = rawPath === "/" ? "/index.html" : rawPath;
     const safePath = path.normalize(requestPath).replace(/^(\.\.[/\\])+/, "");
     let filePath = path.join(distDir, safePath);
@@ -95,7 +313,7 @@ function createStaticServer() {
     fs.readFile(filePath, (error, data) => {
       if (error) {
         res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
-        res.end("Failed to load frontend assets.");
+        res.end("Failed to load runner assets.");
         return;
       }
 
@@ -105,29 +323,6 @@ function createStaticServer() {
   });
 }
 
-function openBrowser(url) {
-  if (process.env.NO_OPEN_BROWSER === "1") {
-    return;
-  }
-
-  const platform = process.platform;
-
-  if (platform === "win32") {
-    spawn("cmd", ["/c", "start", "", url], {
-      stdio: "ignore",
-      detached: true
-    }).unref();
-    return;
-  }
-
-  if (platform === "darwin") {
-    spawn("open", [url], { stdio: "ignore", detached: true }).unref();
-    return;
-  }
-
-  spawn("xdg-open", [url], { stdio: "ignore", detached: true }).unref();
-}
-
 async function main() {
   if (!fs.existsSync(distDir)) {
     throw new Error("Missing dist folder. Run the build first.");
@@ -135,68 +330,37 @@ async function main() {
 
   const configSnapshot = configStore.readConfig();
   const host = configSnapshot.effective.interfaces.host;
-  const fePort = configSnapshot.effective.ports.frontend;
-  const mqttTcpPort = configSnapshot.effective.ports.mqttTcp;
-  const mqttWsPort = configSnapshot.effective.ports.mqttWs;
-  const backendExecutable = configSnapshot.effective.paths.backendExecutable;
-  const backendEntry = path.resolve(
-    projectRoot,
-    configSnapshot.effective.paths.backendEntry
-  );
-  const backendWorkingDirectory = path.resolve(
-    projectRoot,
-    configSnapshot.effective.paths.backendWorkingDirectory
-  );
-  const mqttTopic = configSnapshot.effective.mqtt.testTopic;
-
-  const brokerRuntime = await startBroker({
-    mqttPort: mqttTcpPort,
-    wsPort: mqttWsPort
-  });
+  const runnerPort = configSnapshot.effective.ports.runner;
 
   const staticServer = createStaticServer();
   await new Promise((resolve, reject) => {
     staticServer.once("error", reject);
-    staticServer.listen(fePort, host, resolve);
-  });
-
-  const backendCommand =
-    backendExecutable === "node" ? process.execPath : backendExecutable;
-
-  const backendProcess = spawn(backendCommand, [backendEntry], {
-    cwd: backendWorkingDirectory,
-    stdio: "inherit",
-    env: {
-      ...process.env,
-      MQTT_TCP_URL: `mqtt://${host}:${mqttTcpPort}`,
-      MQTT_TEST_TOPIC: mqttTopic
-    }
-  });
-
-  backendProcess.on("exit", (code) => {
-    if (code !== 0 && code !== null) {
-      console.error(`Backend exited unexpectedly with code ${code}.`);
-    }
+    staticServer.listen(runnerPort, host, resolve);
   });
 
   const shutdown = async () => {
-    backendProcess.kill();
-    await Promise.all([
-      new Promise((resolve) => staticServer.close(resolve)),
-      brokerRuntime.stop()
-    ]);
+    await stopRuntime().catch(() => {});
+    await new Promise((resolve) => staticServer.close(resolve));
     process.exit(0);
   };
 
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
 
-  const frontendUrl = `http://${host}:${fePort}`;
-  console.log(`Frontend ready at ${frontendUrl}`);
-  console.log(`MQTT WebSocket ready at ws://${host}:${mqttWsPort}`);
+  const runnerUrl = `http://${host}:${runnerPort}`;
+  console.log(`Runner ready at ${runnerUrl}`);
   console.log(`Config defaults: ${configStore.defaultConfigPath}`);
   console.log(`Config overrides: ${configStore.userConfigPath}`);
-  openBrowser(frontendUrl);
+
+  if (configSnapshot.effective.runtime?.autoStart) {
+    console.log("Auto-start is enabled. Starting FE, BE, and MQTT packages.");
+    startRuntime().catch((error) => {
+      runtimeState.lastError = error.message;
+      console.error(`Auto-start failed: ${error.message}`);
+    });
+  }
+
+  openBrowser(runnerUrl);
 }
 
 main().catch((error) => {

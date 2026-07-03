@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Injected FE Placeholder</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="card">
+        <p class="eyebrow">Injected Package</p>
+        <h1>Frontend Placeholder</h1>
+        <p class="lede">
+          This is a mocked external frontend package started by the runner on its own port.
+        </p>
+
+        <div class="status-grid">
+          <article class="status-card">
+            <h2>Package</h2>
+            <p class="status-ok">running</p>
+          </article>
+          <article class="status-card">
+            <h2>MQTT</h2>
+            <p id="mqtt-status" class="status-warn">connecting</p>
+          </article>
+          <article class="status-card">
+            <h2>Backend Data</h2>
+            <p id="backend-status" class="status-warn">waiting</p>
+          </article>
+        </div>
+
+        <article class="message-card">
+          <h2>Latest Message</h2>
+          <pre id="message-box">No message received yet.</pre>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+  </html>
