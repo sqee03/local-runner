@@ -1,0 +1,18 @@
+{
+  "interfaces": {
+    "host": "127.0.0.1"
+  },
+  "ports": {
+    "frontend": 4173,
+    "mqttTcp": 18883,
+    "mqttWs": 19001
+  },
+  "paths": {
+    "backendExecutable": "node",
+    "backendEntry": "./scripts/mock-backend.js",
+    "backendWorkingDirectory": "."
+  },
+  "mqtt": {
+    "testTopic": "mvp/test"
+  }
+}

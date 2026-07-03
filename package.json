@@ -1,0 +1,25 @@
+{
+  "name": "local-mqtt-app-runner",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "mock-backend": "node scripts/mock-backend.js",
+    "mvp": "npm run build && node scripts/mvp-orchestrator.js"
+  },
+  "dependencies": {
+    "aedes": "^0.51.3",
+    "mqtt": "^5.10.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "websocket-stream": "^5.5.2",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "vite": "^7.0.0"
+  }
+}
