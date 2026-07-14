@@ -1,11 +1,11 @@
 export const configSections = [
   {
     title: "Interfaces",
-    description: "Hostnames or interfaces used by the local runner.",
+    description: "Local host binding used by the desktop app services.",
     fields: [
       {
         path: "interfaces.host",
-        label: "Host interface",
+        label: "Service host interface",
         type: "text",
         placeholder: "127.0.0.1"
       }
@@ -13,16 +13,16 @@ export const configSections = [
   },
   {
     title: "Ports",
-    description: "Ports the runner uses for the frontend and MQTT services.",
+    description: "Ports used by the internal control service and bundled local services.",
     fields: [
       {
         path: "ports.runner",
-        label: "Runner UI port",
+        label: "Internal control service port",
         type: "number"
       },
       {
         path: "ports.frontendPackage",
-        label: "Frontend package port",
+        label: "Frontend app port",
         type: "number"
       },
       {
@@ -39,17 +39,17 @@ export const configSections = [
   },
   {
     title: "Process Paths",
-    description: "Executable and file locations needed to run the backend process.",
+    description: "Executable, entry, and working-directory paths for the local FE, BE, and MQTT services.",
     fields: [
       {
         path: "paths.frontendExecutable",
-        label: "Frontend executable path",
+        label: "Frontend executable",
         type: "text",
         placeholder: "node"
       },
       {
         path: "paths.frontendEntry",
-        label: "Frontend entry path",
+        label: "Frontend entry",
         type: "text",
         placeholder: "./injections/fe/server.js"
       },
@@ -61,13 +61,13 @@ export const configSections = [
       },
       {
         path: "paths.backendExecutable",
-        label: "Backend executable path",
+        label: "Backend executable",
         type: "text",
         placeholder: "node"
       },
       {
         path: "paths.backendEntry",
-        label: "Backend entry path",
+        label: "Backend entry",
         type: "text",
         placeholder: "./injections/be/server.js"
       },
@@ -79,13 +79,13 @@ export const configSections = [
       },
       {
         path: "paths.mqttExecutable",
-        label: "MQTT executable path",
+        label: "MQTT executable",
         type: "text",
         placeholder: "node"
       },
       {
         path: "paths.mqttEntry",
-        label: "MQTT entry path",
+        label: "MQTT entry",
         type: "text",
         placeholder: "./injections/mqtt/server.js"
       },
@@ -99,7 +99,7 @@ export const configSections = [
   },
   {
     title: "MQTT",
-    description: "Topic-level settings used for the local FE-to-backend test.",
+    description: "Topic settings used by the bundled frontend and backend demo flow.",
     fields: [
       {
         path: "mqtt.testTopic",

@@ -242,7 +242,7 @@ function App() {
         <h1>Config</h1>
         <p className="lede">
           Defaults ship in one JSON file, and your local machine-specific overrides
-          are saved separately for the next launch.
+          are saved separately for the next desktop app launch or service restart.
         </p>
 
         <div className="config-meta">
@@ -318,7 +318,7 @@ function App() {
 
             <div className="config-actions">
               <p className="config-hint">
-                Saved values apply on the next runner start because ports and process
+                Saved values apply the next time services start because ports and process
                 paths are used during boot.
               </p>
               <button className="primary-button" type="submit">
