@@ -27,6 +27,23 @@ body {
   padding: 32px 20px;
 }
 
+.desktop-page-shell {
+  padding: 18px;
+}
+
+.desktop-app-shell {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.desktop-app-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+}
+
 .top-actions {
   width: min(840px, 100%);
   display: flex;
@@ -43,6 +60,35 @@ body {
   background: rgba(10, 18, 28, 0.72);
   box-shadow: 0 22px 60px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(14px);
+}
+
+.desktop-shell {
+  width: min(100%, 1480px);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.desktop-surface {
+  width: 100%;
+}
+
+.desktop-placeholder {
+  padding: 30px;
+  border-radius: 28px;
+  background: rgba(10, 18, 28, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.desktop-placeholder h2 {
+  margin: 0;
+}
+
+.desktop-placeholder p {
+  margin: 12px 0 0;
+  color: #d3dce4;
+  max-width: 58ch;
+  line-height: 1.6;
 }
 
 .eyebrow {
@@ -132,6 +178,12 @@ h1 {
 .runner-button:disabled {
   cursor: wait;
   opacity: 0.82;
+}
+
+.runner-button.compact {
+  min-width: 180px;
+  padding: 14px 22px;
+  font-size: 1rem;
 }
 
 .runner-hint {
@@ -333,7 +385,12 @@ pre {
 }
 
 @media (max-width: 640px) {
-  .hero-card {
+  .hero-card,
+  .config-card {
     padding: 24px;
+  }
+
+  .desktop-placeholder {
+    padding: 20px;
   }
 }

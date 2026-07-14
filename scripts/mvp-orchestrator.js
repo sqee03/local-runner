@@ -12,6 +12,7 @@ const projectRoot = path.resolve(__dirname, "..");
 const distDir = path.join(projectRoot, "dist");
 const configStore = createConfigStore(projectRoot);
 const launchMode = process.env.PACKAGE_RUNNER_LAUNCH_MODE ?? "runner-ui";
+const shellMode = process.env.PACKAGE_RUNNER_SHELL_MODE ?? "browser";
 const runnerPortOverride = Number.parseInt(
   process.env.PACKAGE_RUNNER_PORT_OVERRIDE ?? "",
   10
@@ -38,6 +39,30 @@ const runtimeState = {
     mqtt: null
   }
 };
+
+function applyRuntimePortOverrides(configSnapshot) {
+  return {
+    ...configSnapshot,
+    effective: {
+      ...configSnapshot.effective,
+      ports: {
+        ...configSnapshot.effective.ports,
+        runner: Number.isFinite(runnerPortOverride)
+          ? runnerPortOverride
+          : configSnapshot.effective.ports.runner,
+        frontendPackage: Number.isFinite(packagePortOverrides.frontendPackage)
+          ? packagePortOverrides.frontendPackage
+          : configSnapshot.effective.ports.frontendPackage,
+        mqttTcp: Number.isFinite(packagePortOverrides.mqttTcp)
+          ? packagePortOverrides.mqttTcp
+          : configSnapshot.effective.ports.mqttTcp,
+        mqttWs: Number.isFinite(packagePortOverrides.mqttWs)
+          ? packagePortOverrides.mqttWs
+          : configSnapshot.effective.ports.mqttWs
+      }
+    }
+  };
+}
 
 function contentTypeFor(filePath) {
   if (filePath.endsWith(".html")) return "text/html; charset=utf-8";
@@ -323,7 +348,7 @@ async function startRuntime() {
   runtimeState.isTransitioning = true;
   runtimeState.lastError = null;
 
-  const configSnapshot = configStore.readConfig();
+  const configSnapshot = applyRuntimePortOverrides(configStore.readConfig());
   const packageConfig = buildPackageRuntimeConfig(configSnapshot);
 
   try {
@@ -438,14 +463,8 @@ async function main() {
 
   const configSnapshot = configStore.readConfig();
   const host = configSnapshot.effective.interfaces.host;
-  const runnerPort = Number.isFinite(runnerPortOverride)
-    ? runnerPortOverride
-    : configSnapshot.effective.ports.runner;
-  const resolvedPorts = await resolveRuntimePorts(configSnapshot);
-  configSnapshot.effective = {
-    ...configSnapshot.effective,
-    ports: resolvedPorts
-  };
+  const runtimeConfigSnapshot = applyRuntimePortOverrides(configSnapshot);
+  const runnerPort = runtimeConfigSnapshot.effective.ports.runner;
 
   const staticServer = createStaticServer();
   await new Promise((resolve, reject) => {
@@ -474,20 +493,24 @@ async function main() {
       const runtimePayload = await startRuntime();
       const frontendAppUrl = runtimePayload.currentConfig?.frontendAppUrl;
 
-      if (frontendAppUrl) {
+      if (frontendAppUrl && shellMode !== "desktop") {
         await waitForHttpReady(frontendAppUrl).catch(() => {});
         openBrowser(frontendAppUrl);
       }
     } catch (error) {
       runtimeState.lastError = error.message;
       console.error(`Automatic app launch failed: ${error.message}`);
-      openBrowser(runnerUrl);
+      if (shellMode !== "desktop") {
+        openBrowser(runnerUrl);
+      }
     }
 
     return;
   }
 
-  openBrowser(runnerUrl);
+  if (shellMode !== "desktop") {
+    openBrowser(runnerUrl);
+  }
 }
 
 main().catch((error) => {

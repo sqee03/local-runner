@@ -5,7 +5,7 @@ This repository contains an MVP for a frontend-led local package:
 - a React app served locally
 - a bundled MQTT broker with WebSocket support
 - a backend stub that publishes a test message
-- a launcher that starts everything and opens the browser
+- a launcher that starts everything and presents the experience as a desktop app
 - a Config page backed by local JSON files for defaults and user overrides
 - a Deno-packaged launcher that embeds Node for single-file Windows and Mac distribution
 
@@ -36,7 +36,7 @@ This will:
 - expose MQTT over WebSockets on `ws://127.0.0.1:19001`
 - start the backend publisher
 - serve the frontend on `http://127.0.0.1:4173`
-- open the browser automatically
+- open the runner in the browser automatically for local development
 
 ## What the UI shows
 
@@ -55,10 +55,11 @@ This will:
 
 ## Packaged App Behavior
 
-- Launching the packaged app normally starts the runner service in the background, starts MQTT/BE/FE automatically, and opens the FE app in the browser.
-- The runner/admin page stays available in the background at the runner URL, but it is not opened automatically in normal end-user mode.
-- Launch the same packaged binary with `--runner` to open the runner/admin page directly instead of the FE app.
-- On macOS, the packaged app also starts a menu-bar helper with quick actions for `Open App`, `Open Runner`, and `Quit PackageRunner`.
+- Launching the packaged app normally starts the runner service in the background, starts MQTT/BE/FE automatically, and opens the Simulator inside the desktop app window.
+- The same main app window can switch between `Simulator` and `Config`.
+- Launch the same packaged app with `--runner` to open directly into the Config view.
+- A tray icon stays available with quick actions for `Open Simulator`, `Open config`, and `Quit`.
+- `Quit` closes the desktop shell and stops the managed runtime started by that app instance.
 
 ## Windows single-binary packaging
 
@@ -115,7 +116,7 @@ The Mac packaging flow also builds a small native menu-bar helper, so Xcode Comm
 
 This produces:
 
-- [release/PackageRunner-macos-arm64](/Users/sqee/Documents/local-mqtt-app-runner/release/PackageRunner-macos-arm64)
+- [release/PackageRunner-macos-arm64.app](/Users/sqee/Documents/local-mqtt-app-runner/release/PackageRunner-macos-arm64.app)
 
 What is embedded inside that one file:
 
@@ -124,7 +125,7 @@ What is embedded inside that one file:
 - the injected `fe`, `be`, and `mqtt` packages
 - the runner scripts and runtime dependencies
 
-At runtime, the executable extracts its embedded payload automatically and starts the runner through the bundled Mac Node runtime. User-writable config is kept outside that extracted payload in a stable data folder so updates do not wipe overrides.
+At runtime, the desktop app extracts its embedded payload automatically, starts the runner through the bundled Mac Node runtime, and loads the Simulator inside the app window. User-writable config is kept outside that extracted payload in a stable data folder so updates do not wipe overrides.
 
 User config location:
 
@@ -142,7 +143,8 @@ Bundled runtime behavior:
 - each packaging command vendors the required official Node runtime locally into `vendor/` before building
 - if the runtime already exists locally, it is reused
 
-Important Mac note:
+Important Mac notes:
 
-- `deno compile` adds an ad-hoc signature by default
+- the packaging flow builds the `.app` bundle in `/tmp` and then copies it into `release/` to avoid macOS extended-attribute issues when signing directly inside iCloud/Documents-backed folders
+- the generated app is ad-hoc signed by the Deno packaging flow
 - for smoother distribution to other Mac users, proper Apple signing and notarization is still recommended

@@ -6,11 +6,25 @@ import {
   setValueAtPath
 } from "./config-fields";
 
+function resolvePage(pathname) {
+  if (pathname.startsWith("/desktop/config")) {
+    return "desktop-config";
+  }
+
+  if (pathname.startsWith("/desktop/simulator")) {
+    return "desktop-simulator";
+  }
+
+  if (pathname.startsWith("/config")) {
+    return "config";
+  }
+
+  return "home";
+}
+
 function App() {
   const frontendWindowRef = useRef(null);
-  const [page, setPage] = useState(() =>
-    window.location.pathname.startsWith("/config") ? "config" : "home"
-  );
+  const [page, setPage] = useState(() => resolvePage(window.location.pathname));
   const [configData, setConfigData] = useState(null);
   const [formState, setFormState] = useState(null);
   const [configStatus, setConfigStatus] = useState("Loading configuration...");
@@ -20,12 +34,15 @@ function App() {
     isTransitioning: false,
     lastError: null
   });
-  const [runtimeActionState, setRuntimeActionState] = useState("idle");
   const [copyState, setCopyState] = useState("idle");
+
+  const isDesktopShell = page.startsWith("desktop-");
+  const isConfigPage = page === "config" || page === "desktop-config";
+  const isDesktopSimulatorPage = page === "desktop-simulator";
 
   useEffect(() => {
     const onPopState = () => {
-      setPage(window.location.pathname.startsWith("/config") ? "config" : "home");
+      setPage(resolvePage(window.location.pathname));
     };
 
     window.addEventListener("popstate", onPopState);
@@ -84,7 +101,15 @@ function App() {
   }
 
   function navigate(nextPage) {
-    const nextPath = nextPage === "config" ? "/config" : "/";
+    const nextPath =
+      nextPage === "config"
+        ? "/config"
+        : nextPage === "desktop-config"
+          ? "/desktop/config"
+          : nextPage === "desktop-simulator"
+            ? "/desktop/simulator"
+            : "/";
+
     window.history.pushState({}, "", nextPath);
     setPage(nextPage);
   }
@@ -106,9 +131,7 @@ function App() {
       return;
     }
 
-    const parsedValue =
-      type === "number" ? Number(rawValue) : rawValue;
-
+    const parsedValue = type === "number" ? Number(rawValue) : rawValue;
     setFormState((current) => setValueAtPath(current, path, parsedValue));
     setSaveState("idle");
   }
@@ -141,7 +164,6 @@ function App() {
 
   async function toggleRuntime() {
     const nextAction = runtimeState.isRunning ? "stop" : "start";
-    setRuntimeActionState(nextAction === "start" ? "starting" : "stopping");
 
     try {
       const response = await fetch(`/api/runtime/${nextAction}`, {
@@ -153,19 +175,25 @@ function App() {
         throw new Error(payload.error ?? `Failed to ${nextAction} runtime.`);
       }
 
-      if (nextAction === "start" && payload.currentConfig?.frontendAppUrl) {
+      if (
+        nextAction === "start" &&
+        payload.currentConfig?.frontendAppUrl &&
+        !isDesktopShell
+      ) {
         tryOpenFrontend(payload.currentConfig.frontendAppUrl);
       }
 
-      if (nextAction === "stop" && frontendWindowRef.current && !frontendWindowRef.current.closed) {
+      if (
+        nextAction === "stop" &&
+        frontendWindowRef.current &&
+        !frontendWindowRef.current.closed
+      ) {
         frontendWindowRef.current.close();
         frontendWindowRef.current = null;
       }
 
       setRuntimeState(payload);
-      setRuntimeActionState("idle");
     } catch (error) {
-      setRuntimeActionState(error.message);
       setRuntimeState((current) => ({
         ...current,
         lastError: error.message
@@ -188,24 +216,195 @@ function App() {
     }
   }
 
-  const currentConfigPath = configData?.filePaths?.userConfig ?? "Loading...";
-  const defaultConfigPath = configData?.filePaths?.defaultConfig ?? "Loading...";
+  function renderRuntimeStatusText() {
+    if (runtimeState.lastError) {
+      return `Runner error: ${runtimeState.lastError}`;
+    }
+
+    if (runtimeState.isTransitioning) {
+      return runtimeState.isRunning
+        ? "Runtime is stopping..."
+        : "Runtime is starting...";
+    }
+
+    return runtimeState.isRunning
+      ? "Injected FE, BE, and MQTT packages are active."
+      : "Runner is ready. Start the runtime to load the Simulator.";
+  }
+
+  function renderConfigForm() {
+    const currentConfigPath = configData?.filePaths?.userConfig ?? "Loading...";
+    const defaultConfigPath = configData?.filePaths?.defaultConfig ?? "Loading...";
+
+    return (
+      <section className={isDesktopShell ? "config-card desktop-surface" : "config-card"}>
+        <p className="eyebrow">Runner Settings</p>
+        <h1>Config</h1>
+        <p className="lede">
+          Defaults ship in one JSON file, and your local machine-specific overrides
+          are saved separately for the next launch.
+        </p>
+
+        <div className="config-meta">
+          <p><strong>Defaults:</strong> {defaultConfigPath}</p>
+          <p><strong>User overrides:</strong> {currentConfigPath}</p>
+          <p><strong>Status:</strong> {configStatus}</p>
+        </div>
+
+        {formState ? (
+          <form className="config-form" onSubmit={saveConfig}>
+            {configSections.map((section) => (
+              <section className="config-section" key={section.title}>
+                <div className="config-section-copy">
+                  <h2>{section.title}</h2>
+                  <p>{section.description}</p>
+                </div>
+
+                <div className="field-grid">
+                  {section.fields.map((field) => {
+                    const overrideValue = getValueAtPath(formState, field.path);
+                    const effectiveValue = getValueAtPath(
+                      configData?.effective ?? {},
+                      field.path
+                    );
+                    const inputValue =
+                      field.type === "checkbox"
+                        ? Boolean(
+                            overrideValue === undefined
+                              ? effectiveValue
+                              : overrideValue
+                          )
+                        : overrideValue === undefined
+                          ? ""
+                          : String(overrideValue);
+
+                    return (
+                      <label className="field-card" key={field.path}>
+                        <span>{field.label}</span>
+                        {field.type === "checkbox" ? (
+                          <input
+                            className="toggle-input"
+                            type="checkbox"
+                            checked={inputValue}
+                            onChange={(event) =>
+                              handleFieldChange(
+                                field.path,
+                                event.target.checked,
+                                field.type
+                              )
+                            }
+                          />
+                        ) : (
+                          <input
+                            type={field.type}
+                            value={inputValue}
+                            placeholder={field.placeholder ?? String(effectiveValue ?? "")}
+                            onChange={(event) =>
+                              handleFieldChange(
+                                field.path,
+                                event.target.value,
+                                field.type
+                              )
+                            }
+                          />
+                        )}
+                        <small>Current effective value: {String(effectiveValue ?? "")}</small>
+                      </label>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+
+            <div className="config-actions">
+              <p className="config-hint">
+                Saved values apply on the next runner start because ports and process
+                paths are used during boot.
+              </p>
+              <button className="primary-button" type="submit">
+                Save overrides
+              </button>
+              <span className="save-status">
+                {saveState === "idle"
+                  ? "No unsaved status."
+                  : saveState === "saving"
+                    ? "Saving..."
+                    : saveState === "saved"
+                      ? "Saved."
+                      : saveState}
+              </span>
+            </div>
+          </form>
+        ) : (
+          <article className="message-card">
+            <h2>Configuration</h2>
+            <pre>{configStatus}</pre>
+          </article>
+        )}
+      </section>
+    );
+  }
+
+  function renderDesktopSimulator() {
+    const frontendUrl = runtimeState.currentConfig?.frontendAppUrl;
+
+    if (runtimeState.isRunning && frontendUrl) {
+      return (
+        <section className="desktop-app-shell">
+          <iframe
+            className="desktop-app-frame"
+            key={frontendUrl}
+            src={frontendUrl}
+            title="PackageRunner Simulator"
+          />
+        </section>
+      );
+    }
+
+    return (
+      <main className="page-shell desktop-page-shell">
+        <section className="desktop-shell">
+          <article className="desktop-placeholder">
+            <h2>Simulator waiting for runtime</h2>
+            <p>
+              Start the runtime to launch FE, BE, and MQTT, then the Simulator
+              will appear directly in this window.
+            </p>
+          </article>
+        </section>
+      </main>
+    );
+  }
+
+  if (isDesktopShell) {
+    if (isDesktopSimulatorPage) {
+      return renderDesktopSimulator();
+    }
+
+    return (
+      <main className="page-shell desktop-page-shell">
+        <section className="desktop-shell">
+          {renderConfigForm()}
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="page-shell">
       <div className="top-actions">
-        {page === "home" ? (
-          <button className="ghost-button" type="button" onClick={() => navigate("config")}>
-            Config
-          </button>
-        ) : (
+        {isConfigPage ? (
           <button className="ghost-button" type="button" onClick={() => navigate("home")}>
             Back
+          </button>
+        ) : (
+          <button className="ghost-button" type="button" onClick={() => navigate("config")}>
+            Config
           </button>
         )}
       </div>
 
-      {page === "home" ? (
+      {!isConfigPage ? (
         <section className="hero-card">
           <p className="eyebrow">Runner control tool</p>
           <h1>Package Runner</h1>
@@ -255,160 +454,32 @@ function App() {
                 </div>
               ) : null}
             </div>
-            <p className="runner-hint">
-              {runtimeState.lastError
-                ? `Runner error: ${runtimeState.lastError}`
-                : runtimeState.isRunning
-                  ? "Injected FE, BE, and MQTT packages are active."
-                  : "Runner UI is loaded. Press Start to launch FE, BE, and MQTT packages."}
-            </p>
+            <p className="runner-hint">{renderRuntimeStatusText()}</p>
           </div>
 
           <div className="status-grid">
             <article className="status-card">
               <h2>Frontend Package</h2>
-              <p
-                className={
-                  runtimeState.packageStatus?.fe === "running"
-                    ? "status-ok"
-                    : "status-warn"
-                }
-              >
+              <p className={runtimeState.packageStatus?.fe === "running" ? "status-ok" : "status-warn"}>
                 {runtimeState.packageStatus?.fe ?? "stopped"}
               </p>
             </article>
             <article className="status-card">
               <h2>MQTT Package</h2>
-              <p
-                className={
-                  runtimeState.packageStatus?.mqtt === "running"
-                    ? "status-ok"
-                    : "status-warn"
-                }
-              >
+              <p className={runtimeState.packageStatus?.mqtt === "running" ? "status-ok" : "status-warn"}>
                 {runtimeState.packageStatus?.mqtt ?? "stopped"}
               </p>
             </article>
             <article className="status-card">
               <h2>Backend Package</h2>
-              <p
-                className={
-                  runtimeState.packageStatus?.be === "running"
-                    ? "status-ok"
-                    : "status-warn"
-                }
-              >
+              <p className={runtimeState.packageStatus?.be === "running" ? "status-ok" : "status-warn"}>
                 {runtimeState.packageStatus?.be ?? "stopped"}
               </p>
             </article>
           </div>
         </section>
       ) : (
-        <section className="config-card">
-          <p className="eyebrow">Runner Settings</p>
-          <h1>Config</h1>
-          <p className="lede">
-            Defaults ship in one JSON file, and your local machine-specific overrides
-            are saved separately for the next launch.
-          </p>
-
-          <div className="config-meta">
-            <p><strong>Defaults:</strong> {defaultConfigPath}</p>
-            <p><strong>User overrides:</strong> {currentConfigPath}</p>
-            <p><strong>Status:</strong> {configStatus}</p>
-          </div>
-
-          {formState ? (
-            <form className="config-form" onSubmit={saveConfig}>
-              {configSections.map((section) => (
-                <section className="config-section" key={section.title}>
-                  <div className="config-section-copy">
-                    <h2>{section.title}</h2>
-                    <p>{section.description}</p>
-                  </div>
-
-                  <div className="field-grid">
-                    {section.fields.map((field) => {
-                      const overrideValue = getValueAtPath(formState, field.path);
-                      const effectiveValue = getValueAtPath(
-                        configData?.effective ?? {},
-                        field.path
-                      );
-                      const inputValue =
-                        field.type === "checkbox"
-                          ? Boolean(
-                              overrideValue === undefined
-                                ? effectiveValue
-                                : overrideValue
-                            )
-                          : overrideValue === undefined
-                            ? ""
-                            : String(overrideValue);
-
-                      return (
-                        <label className="field-card" key={field.path}>
-                          <span>{field.label}</span>
-                          {field.type === "checkbox" ? (
-                            <input
-                              className="toggle-input"
-                              type="checkbox"
-                              checked={inputValue}
-                              onChange={(event) =>
-                                handleFieldChange(
-                                  field.path,
-                                  event.target.checked,
-                                  field.type
-                                )
-                              }
-                            />
-                          ) : (
-                            <input
-                              type={field.type}
-                              value={inputValue}
-                              placeholder={field.placeholder ?? String(effectiveValue ?? "")}
-                              onChange={(event) =>
-                                handleFieldChange(
-                                  field.path,
-                                  event.target.value,
-                                  field.type
-                                )
-                              }
-                            />
-                          )}
-                          <small>Current effective value: {String(effectiveValue ?? "")}</small>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </section>
-              ))}
-
-              <div className="config-actions">
-                <p className="config-hint">
-                  Saved values apply on the next runner start because ports and process
-                  paths are used during boot.
-                </p>
-                <button className="primary-button" type="submit">
-                  Save overrides
-                </button>
-                <span className="save-status">
-                  {saveState === "idle"
-                    ? "No unsaved status."
-                    : saveState === "saving"
-                      ? "Saving..."
-                      : saveState === "saved"
-                        ? "Saved."
-                        : saveState}
-                </span>
-              </div>
-            </form>
-          ) : (
-            <article className="message-card">
-              <h2>Configuration</h2>
-              <pre>{configStatus}</pre>
-            </article>
-          )}
-        </section>
+        renderConfigForm()
       )}
     </main>
   );

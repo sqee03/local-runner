@@ -17,19 +17,17 @@ const runtimeSources = {
 
 const targetSources = {
   windows: [],
-  "mac-arm64": ["desktop/bin/PackageRunnerTrayHelper"]
+  "mac-arm64": []
 };
 
 const requiredRuntimeFiles = {
   windows: ["vendor/windows-node-x64/node.exe"],
-  "mac-arm64": [
-    "vendor/macos-arm64-node/bin/node",
-    "desktop/bin/PackageRunnerTrayHelper"
-  ]
+  "mac-arm64": ["vendor/macos-arm64-node/bin/node"]
 };
 
 const baseSources = [
   "config",
+  "desktop/assets",
   "dist",
   "injections",
   "node_modules",

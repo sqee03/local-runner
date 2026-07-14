@@ -57,3 +57,8 @@ const server = http.createServer((req, res) => {
 server.listen(port, host, () => {
   console.log(`Injected FE package ready at http://${host}:${port}`);
 });
+
+server.on("error", (error) => {
+  console.error(`Injected FE package failed to start on http://${host}:${port}: ${error.message}`);
+  process.exit(1);
+});
