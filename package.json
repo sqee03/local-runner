@@ -8,9 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "runner": "npm run build && node scripts/mvp-orchestrator.js",
-    "package:windows": "npm run build && node scripts/create-deno-payload.js windows && deno task package:windows",
-    "package:windows:gui": "npm run build && node scripts/create-deno-payload.js windows && deno task package:windows:gui",
-    "package:mac:arm": "npm run build && node scripts/create-deno-payload.js mac-arm64 && deno task package:mac:arm"
+    "package:windows": "npm run build && node scripts/ensure-vendored-node-runtime.js windows && node scripts/create-deno-payload.js windows && deno task package:windows",
+    "package:windows:gui": "npm run build && node scripts/ensure-vendored-node-runtime.js windows && node scripts/create-deno-payload.js windows && deno task package:windows:gui",
+    "package:mac:arm": "npm run build && node scripts/ensure-vendored-node-runtime.js mac-arm64 && node scripts/create-deno-payload.js mac-arm64 && deno task package:mac:arm"
   },
   "dependencies": {
     "aedes": "^0.51.3",

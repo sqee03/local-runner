@@ -61,6 +61,8 @@ Build the single Windows executable with:
 npm run package:windows
 ```
 
+The build downloads the official Windows x64 Node.js runtime locally on demand into `vendor/windows-node-x64/` if it is missing.
+
 This produces:
 
 - [release/PackageRunner.exe](/Users/sqee/Documents/local-mqtt-app-runner/release/PackageRunner.exe)
@@ -100,6 +102,8 @@ Build the Apple Silicon Mac executable with:
 npm run package:mac:arm
 ```
 
+The build downloads the official macOS ARM64 Node.js runtime locally on demand into `vendor/macos-arm64-node/` if it is missing.
+
 This produces:
 
 - [release/PackageRunner-macos-arm64](/Users/sqee/Documents/local-mqtt-app-runner/release/PackageRunner-macos-arm64)
@@ -123,10 +127,11 @@ Files created there:
 - `defaults.json`
 - `user-overrides.json`
 
-Required bundled runtime before building:
+Bundled runtime behavior:
 
-- extracted Mac ARM Node runtime at `vendor/macos-arm64-node/bin/node`
-- `npm run package:mac:arm` now fails immediately if that file is missing, instead of producing a broken binary
+- runtime binaries are not meant to be committed to git
+- each packaging command vendors the required official Node runtime locally into `vendor/` before building
+- if the runtime already exists locally, it is reused
 
 Important Mac note:
 
