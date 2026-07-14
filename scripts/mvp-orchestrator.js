@@ -1,6 +1,7 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
+import net from "node:net";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createConfigStore } from "./config-store.js";
@@ -10,6 +11,16 @@ const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const distDir = path.join(projectRoot, "dist");
 const configStore = createConfigStore(projectRoot);
+const launchMode = process.env.PACKAGE_RUNNER_LAUNCH_MODE ?? "runner-ui";
+const runnerPortOverride = Number.parseInt(
+  process.env.PACKAGE_RUNNER_PORT_OVERRIDE ?? "",
+  10
+);
+const packagePortOverrides = {
+  frontendPackage: Number.parseInt(process.env.PACKAGE_RUNNER_FRONTEND_PORT_OVERRIDE ?? "", 10),
+  mqttTcp: Number.parseInt(process.env.PACKAGE_RUNNER_MQTT_TCP_PORT_OVERRIDE ?? "", 10),
+  mqttWs: Number.parseInt(process.env.PACKAGE_RUNNER_MQTT_WS_PORT_OVERRIDE ?? "", 10)
+};
 
 const runtimeState = {
   isRunning: false,
@@ -107,13 +118,110 @@ function openBrowser(url) {
   spawn("xdg-open", [url], { stdio: "ignore", detached: true }).unref();
 }
 
+function waitForHttpReady(url, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const deadline = Date.now() + timeoutMs;
+
+    function attempt() {
+      const request = http.get(url, (response) => {
+        response.resume();
+        resolve();
+      });
+
+      request.on("error", () => {
+        if (Date.now() >= deadline) {
+          reject(new Error(`Timed out waiting for ${url}`));
+          return;
+        }
+
+        setTimeout(attempt, 250);
+      });
+    }
+
+    attempt();
+  });
+}
+
+function canBindPort(host, port) {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+
+    server.once("error", (error) => {
+      if (error.code === "EADDRINUSE") {
+        resolve(false);
+        return;
+      }
+
+      reject(error);
+    });
+
+    server.listen(port, host, () => {
+      server.close(() => resolve(true));
+    });
+  });
+}
+
+async function findAvailablePort(host, preferredPort) {
+  if (await canBindPort(host, preferredPort)) {
+    return preferredPort;
+  }
+
+  for (let candidate = preferredPort + 1; candidate < preferredPort + 25; candidate += 1) {
+    if (await canBindPort(host, candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error(
+    `Port ${preferredPort} is unavailable and no fallback port was found nearby.`
+  );
+}
+
+async function resolveRuntimePorts(configSnapshot) {
+  const host = configSnapshot.effective.interfaces.host;
+  const configuredPorts = configSnapshot.effective.ports;
+
+  const ports = {
+    ...configuredPorts,
+    runner: Number.isFinite(runnerPortOverride) ? runnerPortOverride : configuredPorts.runner,
+    frontendPackage: Number.isFinite(packagePortOverrides.frontendPackage)
+      ? packagePortOverrides.frontendPackage
+      : configuredPorts.frontendPackage,
+    mqttTcp: Number.isFinite(packagePortOverrides.mqttTcp)
+      ? packagePortOverrides.mqttTcp
+      : configuredPorts.mqttTcp,
+    mqttWs: Number.isFinite(packagePortOverrides.mqttWs)
+      ? packagePortOverrides.mqttWs
+      : configuredPorts.mqttWs
+  };
+
+  const portMappings = [
+    ["frontendPackage", "frontend package"],
+    ["mqttTcp", "MQTT TCP"],
+    ["mqttWs", "MQTT WebSocket"]
+  ];
+
+  for (const [key, label] of portMappings) {
+    const preferredPort = ports[key];
+    const resolvedPort = await findAvailablePort(host, preferredPort);
+
+    if (resolvedPort !== preferredPort) {
+      console.warn(`${label} port ${preferredPort} is busy. Falling back to ${resolvedPort}.`);
+      ports[key] = resolvedPort;
+    }
+  }
+
+  return ports;
+}
+
 function buildPackageRuntimeConfig(configSnapshot) {
   const effective = configSnapshot.effective;
   const host = effective.interfaces.host;
+  const ports = effective.ports;
 
   return {
     host,
-    ports: effective.ports,
+    ports,
     mqttTopic: effective.mqtt.testTopic,
     packageDefinitions: {
       mqtt: {
@@ -126,8 +234,8 @@ function buildPackageRuntimeConfig(configSnapshot) {
         env: {
           ...process.env,
           MQTT_HOST: host,
-          MQTT_TCP_PORT: String(effective.ports.mqttTcp),
-          MQTT_WS_PORT: String(effective.ports.mqttWs)
+          MQTT_TCP_PORT: String(ports.mqttTcp),
+          MQTT_WS_PORT: String(ports.mqttWs)
         }
       },
       be: {
@@ -139,7 +247,7 @@ function buildPackageRuntimeConfig(configSnapshot) {
         cwd: path.resolve(projectRoot, effective.paths.backendWorkingDirectory),
         env: {
           ...process.env,
-          MQTT_TCP_URL: `mqtt://${host}:${effective.ports.mqttTcp}`,
+          MQTT_TCP_URL: `mqtt://${host}:${ports.mqttTcp}`,
           MQTT_TEST_TOPIC: effective.mqtt.testTopic
         }
       },
@@ -153,8 +261,8 @@ function buildPackageRuntimeConfig(configSnapshot) {
         env: {
           ...process.env,
           FE_HOST: host,
-          FE_PORT: String(effective.ports.frontendPackage),
-          MQTT_WS_PORT: String(effective.ports.mqttWs),
+          FE_PORT: String(ports.frontendPackage),
+          MQTT_WS_PORT: String(ports.mqttWs),
           MQTT_TEST_TOPIC: effective.mqtt.testTopic
         }
       }
@@ -330,7 +438,14 @@ async function main() {
 
   const configSnapshot = configStore.readConfig();
   const host = configSnapshot.effective.interfaces.host;
-  const runnerPort = configSnapshot.effective.ports.runner;
+  const runnerPort = Number.isFinite(runnerPortOverride)
+    ? runnerPortOverride
+    : configSnapshot.effective.ports.runner;
+  const resolvedPorts = await resolveRuntimePorts(configSnapshot);
+  configSnapshot.effective = {
+    ...configSnapshot.effective,
+    ports: resolvedPorts
+  };
 
   const staticServer = createStaticServer();
   await new Promise((resolve, reject) => {
@@ -352,12 +467,24 @@ async function main() {
   console.log(`Config defaults: ${configStore.defaultConfigPath}`);
   console.log(`Config overrides: ${configStore.userConfigPath}`);
 
-  if (configSnapshot.effective.runtime?.autoStart) {
-    console.log("Auto-start is enabled. Starting FE, BE, and MQTT packages.");
-    startRuntime().catch((error) => {
+  if (launchMode === "app") {
+    console.log("App launch mode enabled. Starting FE, BE, and MQTT packages.");
+
+    try {
+      const runtimePayload = await startRuntime();
+      const frontendAppUrl = runtimePayload.currentConfig?.frontendAppUrl;
+
+      if (frontendAppUrl) {
+        await waitForHttpReady(frontendAppUrl).catch(() => {});
+        openBrowser(frontendAppUrl);
+      }
+    } catch (error) {
       runtimeState.lastError = error.message;
-      console.error(`Auto-start failed: ${error.message}`);
-    });
+      console.error(`Automatic app launch failed: ${error.message}`);
+      openBrowser(runnerUrl);
+    }
+
+    return;
   }
 
   openBrowser(runnerUrl);

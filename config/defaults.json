@@ -21,9 +21,5 @@
   },
   "mqtt": {
     "testTopic": "mvp/test"
-  },
-  "runtime": {
-    "autoStart": false,
-    "autoOpenFrontend": false
   }
 }

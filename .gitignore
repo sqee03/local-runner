@@ -1,6 +1,8 @@
 node_modules/
 dist/
 release/
+.tmp/
 vendor/macos-arm64-node/
 vendor/windows-node-x64/
+desktop/bin/
 .DS_Store

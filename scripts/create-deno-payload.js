@@ -15,9 +15,17 @@ const runtimeSources = {
   "mac-arm64": ["vendor/macos-arm64-node"]
 };
 
+const targetSources = {
+  windows: [],
+  "mac-arm64": ["desktop/bin/PackageRunnerTrayHelper"]
+};
+
 const requiredRuntimeFiles = {
   windows: ["vendor/windows-node-x64/node.exe"],
-  "mac-arm64": ["vendor/macos-arm64-node/bin/node"]
+  "mac-arm64": [
+    "vendor/macos-arm64-node/bin/node",
+    "desktop/bin/PackageRunnerTrayHelper"
+  ]
 };
 
 const baseSources = [
@@ -64,7 +72,7 @@ function buildPayloadManifest() {
     throw new Error(`Unsupported payload target "${target}". Use "windows" or "mac-arm64".`);
   }
 
-  const sourcePaths = [...baseSources, ...runtimeSources[target]];
+  const sourcePaths = [...baseSources, ...runtimeSources[target], ...(targetSources[target] ?? [])];
   const requiredFiles = requiredRuntimeFiles[target] ?? [];
 
   for (const sourcePath of sourcePaths) {

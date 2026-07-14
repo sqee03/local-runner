@@ -69,7 +69,7 @@ export const configSections = [
         path: "paths.backendEntry",
         label: "Backend entry path",
         type: "text",
-        placeholder: "./scripts/mock-backend.js"
+        placeholder: "./injections/be/server.js"
       },
       {
         path: "paths.backendWorkingDirectory",
@@ -106,22 +106,6 @@ export const configSections = [
         label: "Test topic",
         type: "text",
         placeholder: "mvp/test"
-      }
-    ]
-  },
-  {
-    title: "Runtime",
-    description: "Control whether services start automatically when the runner launches.",
-    fields: [
-      {
-        path: "runtime.autoStart",
-        label: "Auto-start runtime on launch",
-        type: "checkbox"
-      },
-      {
-        path: "runtime.autoOpenFrontend",
-        label: "Auto-open frontend tab when runtime starts",
-        type: "checkbox"
       }
     ]
   }

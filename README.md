@@ -53,6 +53,13 @@ This will:
 - Use the `Config` button in the top-right corner to edit ports, interfaces, and process paths
 - Saved overrides are applied the next time the runner starts
 
+## Packaged App Behavior
+
+- Launching the packaged app normally starts the runner service in the background, starts MQTT/BE/FE automatically, and opens the FE app in the browser.
+- The runner/admin page stays available in the background at the runner URL, but it is not opened automatically in normal end-user mode.
+- Launch the same packaged binary with `--runner` to open the runner/admin page directly instead of the FE app.
+- On macOS, the packaged app also starts a menu-bar helper with quick actions for `Open App`, `Open Runner`, and `Quit PackageRunner`.
+
 ## Windows single-binary packaging
 
 Build the single Windows executable with:
@@ -103,6 +110,8 @@ npm run package:mac:arm
 ```
 
 The build downloads the official macOS ARM64 Node.js runtime locally on demand into `vendor/macos-arm64-node/` if it is missing.
+
+The Mac packaging flow also builds a small native menu-bar helper, so Xcode Command Line Tools must be available on the developer machine.
 
 This produces:
 

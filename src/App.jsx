@@ -8,7 +8,6 @@ import {
 
 function App() {
   const frontendWindowRef = useRef(null);
-  const previousRunningRef = useRef(false);
   const [page, setPage] = useState(() =>
     window.location.pathname.startsWith("/config") ? "config" : "home"
   );
@@ -77,26 +76,6 @@ function App() {
     const timer = window.setInterval(loadRuntime, 2000);
     return () => window.clearInterval(timer);
   }, []);
-
-  useEffect(() => {
-    const frontendUrl = runtimeState.currentConfig?.frontendAppUrl;
-    const autoOpenFrontend =
-      runtimeState.currentConfig?.runtime?.autoOpenFrontend === true;
-    const wasRunning = previousRunningRef.current;
-
-    if (
-      runtimeState.isRunning &&
-      frontendUrl &&
-      autoOpenFrontend &&
-      !wasRunning &&
-      !frontendWindowRef.current
-    ) {
-      const openedWindow = window.open(frontendUrl, "package-runner-fe");
-      frontendWindowRef.current = openedWindow;
-    }
-
-    previousRunningRef.current = runtimeState.isRunning;
-  }, [runtimeState.isRunning, runtimeState.currentConfig]);
 
   function tryOpenFrontend(url) {
     const openedWindow = window.open(url, "package-runner-fe");
@@ -174,11 +153,7 @@ function App() {
         throw new Error(payload.error ?? `Failed to ${nextAction} runtime.`);
       }
 
-      if (
-        nextAction === "start" &&
-        payload.currentConfig?.runtime?.autoOpenFrontend === true &&
-        payload.currentConfig?.frontendAppUrl
-      ) {
+      if (nextAction === "start" && payload.currentConfig?.frontendAppUrl) {
         tryOpenFrontend(payload.currentConfig.frontendAppUrl);
       }
 
