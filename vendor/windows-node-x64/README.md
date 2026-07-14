@@ -10,8 +10,4 @@ Expected file:
 vendor/windows-node-x64/node.exe
 ```
 
-You can also point the packaging script at a different extracted Windows Node runtime with:
-
-```bash
-WINDOWS_NODE_RUNTIME_DIR=/absolute/path/to/node-win-x64 npm run package:windows
-```
+The Deno packaging step embeds this `node.exe` directly into the final `PackageRunner.exe`, so end users do not install Node separately.

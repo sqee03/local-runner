@@ -7,11 +7,13 @@ This repository contains an MVP for a frontend-led local package:
 - a backend stub that publishes a test message
 - a launcher that starts everything and opens the browser
 - a Config page backed by local JSON files for defaults and user overrides
+- a Deno-packaged launcher that embeds Node for single-file Windows and Mac distribution
 
 ## Prerequisites
 
 - Node.js 26+
 - npm 11+
+- Deno 2.9+ for Windows and Mac packaging
 
 ## Run the MVP
 
@@ -51,23 +53,82 @@ This will:
 - Use the `Config` button in the top-right corner to edit ports, interfaces, and process paths
 - Saved overrides are applied the next time the runner starts
 
-## Windows portable packaging
+## Windows single-binary packaging
 
-Build a portable Windows bundle with:
+Build the single Windows executable with:
 
 ```bash
 npm run package:windows
 ```
 
-Expected Windows Node runtime location:
+This produces:
 
-- default: [vendor/windows-node-x64](/Users/sqee/Documents/local-mqtt-app-runner/vendor/windows-node-x64)
-- override with env var: `WINDOWS_NODE_RUNTIME_DIR=/path/to/windows-node-runtime`
+- [release/PackageRunner.exe](/Users/sqee/Documents/local-mqtt-app-runner/release/PackageRunner.exe)
 
-The packaging script expects that folder to contain `node.exe`.
+What is embedded inside that one file:
 
-Output:
+- the Node runtime from [vendor/windows-node-x64/node.exe](/Users/sqee/Documents/local-mqtt-app-runner/vendor/windows-node-x64/node.exe)
+- the built runner UI from `dist/`
+- the injected `fe`, `be`, and `mqtt` packages
+- the runner scripts and runtime dependencies
 
-- staged bundle folder: [release/windows-x64](/Users/sqee/Documents/local-mqtt-app-runner/release/windows-x64)
-- launcher: `PackageRunner.cmd`
-- zipped artifact: `release/windows-x64.zip` when the local `zip` command is available
+At runtime, the executable extracts its embedded payload automatically and starts the runner through the bundled `node.exe`. User-writable config is kept outside that extracted payload in a stable data folder so updates do not wipe overrides.
+
+User config location:
+
+- preferred portable location: `<folder containing PackageRunner.exe>/PackageRunner-data/config/`
+- fallback location when the executable folder is not writable: `%LOCALAPPDATA%/PackageRunner/config/`
+
+Files created there:
+
+- `defaults.json`
+- `user-overrides.json`
+
+There is also an optional hidden-console build:
+
+```bash
+npm run package:windows:gui
+```
+
+This produces `release/PackageRunner-gui.exe`. It hides the terminal window, but because the runner is still browser-based, the visible-console build is the safer default until the product adds an explicit in-app Quit action.
+
+## Mac Apple Silicon single-binary packaging
+
+Build the Apple Silicon Mac executable with:
+
+```bash
+npm run package:mac:arm
+```
+
+This produces:
+
+- [release/PackageRunner-macos-arm64](/Users/sqee/Documents/local-mqtt-app-runner/release/PackageRunner-macos-arm64)
+
+What is embedded inside that one file:
+
+- the Node runtime from [vendor/macos-arm64-node/README.md](/Users/sqee/Documents/local-mqtt-app-runner/vendor/macos-arm64-node/README.md)
+- the built runner UI from `dist/`
+- the injected `fe`, `be`, and `mqtt` packages
+- the runner scripts and runtime dependencies
+
+At runtime, the executable extracts its embedded payload automatically and starts the runner through the bundled Mac Node runtime. User-writable config is kept outside that extracted payload in a stable data folder so updates do not wipe overrides.
+
+User config location:
+
+- preferred portable location: `<folder containing PackageRunner-macos-arm64>/PackageRunner-data/config/`
+- fallback location when the executable folder is not writable: `~/Library/Application Support/PackageRunner/config/`
+
+Files created there:
+
+- `defaults.json`
+- `user-overrides.json`
+
+Required bundled runtime before building:
+
+- extracted Mac ARM Node runtime at `vendor/macos-arm64-node/bin/node`
+- `npm run package:mac:arm` now fails immediately if that file is missing, instead of producing a broken binary
+
+Important Mac note:
+
+- `deno compile` adds an ad-hoc signature by default
+- for smoother distribution to other Mac users, proper Apple signing and notarization is still recommended

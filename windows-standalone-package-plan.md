@@ -1,7 +1,7 @@
 # Standalone Windows Package Runner
 
 ## Summary
-Turn the current runner into a self-contained Windows bundle that ships:
+Turn the current runner into a self-contained Windows binary that ships:
 
 - the runner UI build
 - the injected `fe`, `be`, and `mqtt` packages
@@ -11,37 +11,40 @@ Turn the current runner into a self-contained Windows bundle that ships:
 Recommended v1 shape:
 
 - browser-based UX stays as-is
-- package as a portable folder first, with an optional installer later
+- distribute one `.exe` file first, with an optional installer later
 - runner remains the orchestrator; injected packages remain separate sub-packages inside the bundle
 
 ## Key Changes
 
 ### Packaging model
 - Build the React runner UI into static assets as today.
-- Bundle the whole app into a distributable folder such as:
-  - `PackageRunner/PackageRunner.exe`
-  - `PackageRunner/runtime/node/`
-  - `PackageRunner/app/dist/`
-  - `PackageRunner/app/injections/fe`
-  - `PackageRunner/app/injections/be`
-  - `PackageRunner/app/injections/mqtt`
-  - `PackageRunner/app/config/defaults.json`
-  - `PackageRunner/app/config/user-overrides.json`
+- Use a Deno-compiled wrapper executable as the outer package.
+- Embed the whole app payload into that executable:
+  - bundled `node.exe`
+  - runner `dist/`
+  - `injections/fe`
+  - `injections/be`
+  - `injections/mqtt`
+  - runner `scripts/`
+  - runtime `node_modules/`
+  - shipped `config/defaults.json`
 - Do not depend on system Node, npm, or globally installed tooling on the target machine.
+- Use Deno self-extraction so the embedded files become real files on disk at runtime.
 
 ### Launcher
-- Add a thin Windows launcher executable whose only job is to start embedded Node against the runner entry script.
+- Add a thin Deno-based launcher executable whose only job is to start embedded Node against the runner entry script.
 - The launcher should:
-  - resolve paths relative to its own folder
+  - resolve embedded app paths from the extracted runtime directory
   - start the runner server
   - optionally open the runner URL in the default browser
   - exit cleanly when the runner process exits
-- Keep config and package-relative paths rooted to the bundle directory, not the original repo structure.
+- Keep config and package-relative paths rooted to extracted bundle paths, not the original repo structure.
 
 ### Runtime path/config hardening
-- Replace repo-relative assumptions with bundle-relative path resolution.
-- Keep `defaults.json` inside the app package as the shipped baseline.
-- Keep `user-overrides.json` writable beside the defaults or in a dedicated writable subfolder inside the portable bundle.
+- Replace repo-relative assumptions with extracted-bundle-relative path resolution.
+- Keep `defaults.json` embedded inside the app package as the shipped baseline.
+- Copy `defaults.json` into a stable writable data directory on launch so the file is visible to the user.
+- Keep `user-overrides.json` writable in that stable data directory rather than inside the extracted hash folder.
 - Ensure the config schema explicitly covers:
   - runner UI port
   - FE package port
@@ -52,7 +55,8 @@ Recommended v1 shape:
 - For the packaged app, default executable paths should target the bundled sub-packages, not development paths.
 
 ### Windows-specific behavior
-- Make the launcher and runner paths safe for machines where the app is extracted under arbitrary directories.
+- Make the launcher and runner paths safe for machines where the executable is placed under arbitrary directories.
+- Prefer a sibling `PackageRunner-data/` folder for user config; fall back to `%LOCALAPPDATA%` if the executable folder is not writable.
 - Treat browser auto-open as:
   - reliable on explicit `Start`
   - best-effort on `autoStart`
@@ -61,11 +65,10 @@ Recommended v1 shape:
 ### Build/release pipeline
 - Add a release script that produces one Windows artifact from a clean repo:
   1. build runner UI
-  2. copy injected packages and config into a staging folder
-  3. copy a Windows Node runtime into the staging folder
-  4. generate the launcher
-  5. zip the result and optionally create an installer
-- Keep portable-folder output as the primary artifact for v1; installer can be a second artifact later without changing the runtime architecture.
+  2. compile a Deno launcher for `x86_64-pc-windows-msvc`
+  3. embed injected packages, config, scripts, dependencies, and Windows `node.exe`
+  4. output `PackageRunner.exe`
+- Keep the single-file output as the primary artifact for v1; installer can be a second artifact later without changing the runtime architecture.
 
 ## Public Interfaces / Behavior
 - User launches `PackageRunner.exe`
@@ -76,11 +79,11 @@ Recommended v1 shape:
 - Config remains JSON-based and user-editable without rebuilding the app
 
 ## Test Plan
-- Fresh Windows machine with no Node/npm installed: portable bundle launches successfully.
-- Runner starts from an extracted folder with spaces in the path.
+- Fresh Windows machine with no Node/npm installed: single executable launches successfully.
+- Runner starts from an executable path with spaces in the folder name.
 - `Start` launches FE/BE/MQTT using bundled runtimes only.
 - `Stop` terminates all child processes and leaves no listening ports behind.
-- Config overrides persist across relaunches and still resolve bundled package paths correctly.
+- Config overrides persist across relaunches and across updated executable rebuilds.
 - `autoStart=false` keeps the app idle until user clicks `Start`.
 - `autoStart=true` starts runtime automatically on launch.
 - `autoOpenFrontend=true` opens FE on manual `Start`; on launch it is treated as best-effort and degrades to URL/copy flow if blocked.
@@ -88,6 +91,6 @@ Recommended v1 shape:
 
 ## Assumptions
 - v1 should stay browser-based, not move to Electron/Tauri yet.
-- “Portable app” means no required installer for the first release.
+- “Portable app” means one redistributable executable with no required installer for the first release.
 - Bundling an embedded Node runtime is acceptable and preferred over compiling every package into native binaries.
 - FE/BE/MQTT should remain separate injected packages internally, even though they ship together in one distributable app.

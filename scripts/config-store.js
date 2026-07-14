@@ -4,6 +4,8 @@ import path from "node:path";
 export const CONFIG_DIR = "config";
 export const DEFAULT_CONFIG_FILE = "defaults.json";
 export const USER_CONFIG_FILE = "user-overrides.json";
+export const BUNDLED_CONFIG_DIR_ENV = "PACKAGE_RUNNER_BUNDLED_CONFIG_DIR";
+export const USER_CONFIG_DIR_ENV = "PACKAGE_RUNNER_USER_CONFIG_DIR";
 
 function isObject(value) {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -47,17 +49,32 @@ function validateConfigShape(config) {
 }
 
 export function createConfigStore(projectRoot) {
-  const configDir = path.join(projectRoot, CONFIG_DIR);
-  const defaultConfigPath = path.join(configDir, DEFAULT_CONFIG_FILE);
-  const userConfigPath = path.join(configDir, USER_CONFIG_FILE);
+  const bundledConfigDir = path.resolve(
+    process.env[BUNDLED_CONFIG_DIR_ENV] ?? path.join(projectRoot, CONFIG_DIR)
+  );
+  const writableConfigDir = path.resolve(
+    process.env[USER_CONFIG_DIR_ENV] ?? bundledConfigDir
+  );
+  const bundledDefaultConfigPath = path.join(bundledConfigDir, DEFAULT_CONFIG_FILE);
+  const defaultConfigPath = path.join(writableConfigDir, DEFAULT_CONFIG_FILE);
+  const userConfigPath = path.join(writableConfigDir, USER_CONFIG_FILE);
 
   function ensureConfigFiles() {
-    if (!fs.existsSync(configDir)) {
-      fs.mkdirSync(configDir, { recursive: true });
+    if (!fs.existsSync(writableConfigDir)) {
+      fs.mkdirSync(writableConfigDir, { recursive: true });
     }
 
-    if (!fs.existsSync(defaultConfigPath)) {
-      throw new Error(`Missing default config file at ${defaultConfigPath}.`);
+    if (!fs.existsSync(bundledDefaultConfigPath)) {
+      throw new Error(`Missing default config file at ${bundledDefaultConfigPath}.`);
+    }
+
+    const bundledDefaults = fs.readFileSync(bundledDefaultConfigPath, "utf8");
+    const currentDefaults = fs.existsSync(defaultConfigPath)
+      ? fs.readFileSync(defaultConfigPath, "utf8")
+      : null;
+
+    if (currentDefaults !== bundledDefaults) {
+      fs.writeFileSync(defaultConfigPath, bundledDefaults, "utf8");
     }
 
     if (!fs.existsSync(userConfigPath)) {
@@ -95,6 +112,8 @@ export function createConfigStore(projectRoot) {
   }
 
   return {
+    bundledConfigDir,
+    writableConfigDir,
     defaultConfigPath,
     userConfigPath,
     readConfig,
