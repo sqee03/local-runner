@@ -591,8 +591,8 @@ async function launchOrAttachRunner(
       PACKAGE_RUNNER_MQTT_WS_PORT_OVERRIDE: String(portOverrides.mqttWs)
     },
     stdin: shellMode === "desktop" ? "null" : "inherit",
-    stdout: "inherit",
-    stderr: "inherit"
+    stdout: shellMode === "desktop" ? "null" : "inherit",
+    stderr: shellMode === "desktop" ? "null" : "inherit"
   }).spawn();
 
   return {

@@ -310,13 +310,22 @@ function attachPackageExitHandler(packageName, childProcess) {
       console.error(runtimeState.lastError);
     }
   });
+
+  childProcess.on("error", (error) => {
+    runtimeState.packageProcesses[packageName] = null;
+    runtimeState.packageStatus[packageName] = "stopped";
+    runtimeState.lastError = `${packageName.toUpperCase()} package failed to start: ${error.message}`;
+    runtimeState.isRunning = false;
+    runtimeState.isTransitioning = false;
+    console.error(runtimeState.lastError);
+  });
 }
 
 function spawnPackage(packageName, definition) {
   runtimeState.packageStatus[packageName] = "starting";
   const childProcess = spawn(definition.executable, [definition.entry], {
     cwd: definition.cwd,
-    stdio: "inherit",
+    stdio: shellMode === "desktop" ? "ignore" : "inherit",
     env: definition.env
   });
 
