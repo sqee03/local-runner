@@ -12,8 +12,8 @@ const taskName = process.argv[2];
 const target = process.argv[3];
 
 const denoBinaries = {
-  windows: path.join(projectRoot, "vendor", "windows-deno-x64", "deno.exe"),
-  "mac-arm64": path.join(projectRoot, "vendor", "macos-arm64-deno", "deno")
+  windows: path.join(projectRoot, ".tmp", "build-tools", "windows-deno-x64", "deno.exe"),
+  "mac-arm64": path.join(projectRoot, ".tmp", "build-tools", "macos-arm64-deno", "deno")
 };
 
 const hostTarget = process.platform === "win32" ? "windows" : process.platform === "darwin" ? "mac-arm64" : null;

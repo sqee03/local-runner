@@ -13,8 +13,8 @@ const target = process.argv[2];
 
 const runtimeConfigs = {
   windows: {
-    destinationDir: path.join(projectRoot, "vendor", "windows-node-x64"),
-    requiredFile: path.join(projectRoot, "vendor", "windows-node-x64", "node.exe"),
+    destinationDir: path.join(projectRoot, ".tmp", "build-tools", "windows-node-x64"),
+    requiredFile: path.join(projectRoot, ".tmp", "build-tools", "windows-node-x64", "node.exe"),
     archiveFileName: `node-${nodeVersion}-win-x64.zip`,
     downloadUrl: `https://nodejs.org/dist/${nodeVersion}/node-${nodeVersion}-win-x64.zip`,
     extract(archivePath, destinationDir) {
@@ -25,8 +25,8 @@ const runtimeConfigs = {
     }
   },
   "mac-arm64": {
-    destinationDir: path.join(projectRoot, "vendor", "macos-arm64-node"),
-    requiredFile: path.join(projectRoot, "vendor", "macos-arm64-node", "bin", "node"),
+    destinationDir: path.join(projectRoot, ".tmp", "build-tools", "macos-arm64-node"),
+    requiredFile: path.join(projectRoot, ".tmp", "build-tools", "macos-arm64-node", "bin", "node"),
     archiveFileName: `node-${nodeVersion}-darwin-arm64.tar.gz`,
     downloadUrl: `https://nodejs.org/dist/${nodeVersion}/node-${nodeVersion}-darwin-arm64.tar.gz`,
     extract(archivePath, destinationDir) {

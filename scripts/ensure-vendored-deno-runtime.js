@@ -13,8 +13,8 @@ const target = process.argv[2];
 
 const runtimeConfigs = {
   windows: {
-    destinationDir: path.join(projectRoot, "vendor", "windows-deno-x64"),
-    requiredFile: path.join(projectRoot, "vendor", "windows-deno-x64", "deno.exe"),
+    destinationDir: path.join(projectRoot, ".tmp", "build-tools", "windows-deno-x64"),
+    requiredFile: path.join(projectRoot, ".tmp", "build-tools", "windows-deno-x64", "deno.exe"),
     archiveFileName: `deno-x86_64-pc-windows-msvc.zip`,
     downloadUrl: `https://github.com/denoland/deno/releases/download/${denoVersion}/deno-x86_64-pc-windows-msvc.zip`,
     extract(archivePath, destinationDir) {
@@ -22,8 +22,8 @@ const runtimeConfigs = {
     }
   },
   "mac-arm64": {
-    destinationDir: path.join(projectRoot, "vendor", "macos-arm64-deno"),
-    requiredFile: path.join(projectRoot, "vendor", "macos-arm64-deno", "deno"),
+    destinationDir: path.join(projectRoot, ".tmp", "build-tools", "macos-arm64-deno"),
+    requiredFile: path.join(projectRoot, ".tmp", "build-tools", "macos-arm64-deno", "deno"),
     archiveFileName: `deno-aarch64-apple-darwin.zip`,
     downloadUrl: `https://github.com/denoland/deno/releases/download/${denoVersion}/deno-aarch64-apple-darwin.zip`,
     extract(archivePath, destinationDir) {

@@ -19,13 +19,13 @@ const target = process.argv[2];
 const runtimeSources = {
   windows: [
     {
-      source: "vendor/windows-node-x64/node.exe",
+      source: ".tmp/build-tools/windows-node-x64/node.exe",
       target: "vendor/windows-node-x64/node.exe"
     }
   ],
   "mac-arm64": [
     {
-      source: "vendor/macos-arm64-node/bin/node",
+      source: ".tmp/build-tools/macos-arm64-node/bin/node",
       target: "vendor/macos-arm64-node/bin/node"
     }
   ]
@@ -37,8 +37,8 @@ const targetSources = {
 };
 
 const requiredRuntimeFiles = {
-  windows: ["vendor/windows-node-x64/node.exe"],
-  "mac-arm64": ["vendor/macos-arm64-node/bin/node"]
+  windows: [".tmp/build-tools/windows-node-x64/node.exe"],
+  "mac-arm64": [".tmp/build-tools/macos-arm64-node/bin/node"]
 };
 
 const baseSources = [

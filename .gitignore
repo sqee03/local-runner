@@ -2,9 +2,10 @@ node_modules/
 dist/
 release/
 .tmp/
-vendor/macos-arm64-node/
-vendor/windows-node-x64/
+.tmp/build-tools/
+.tmp/build-tools/windows-node-x64/
+.tmp/build-tools/windows-deno-x64/
+.tmp/build-tools/macos-arm64-node/
+.tmp/build-tools/macos-arm64-deno/
 desktop/bin/
 .DS_Store
-vendor/macos-arm64-deno/
-vendor/windows-deno-x64/
