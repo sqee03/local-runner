@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -8,6 +7,7 @@ const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const stagingRoot = path.join(projectRoot, ".tmp", "runtime-node_modules");
 const stagingNodeModulesDir = path.join(stagingRoot, "node_modules");
+const packageLockPath = path.join(projectRoot, "package-lock.json");
 
 // These packages are only needed to build the runner UI into dist/.
 const excludedTopLevelPackages = new Set(["react", "react-dom", "scheduler"]);
@@ -17,25 +17,35 @@ function ensureCleanDirectory(directoryPath) {
   fs.mkdirSync(directoryPath, { recursive: true });
 }
 
-function listRuntimePackageDirectories() {
-  const result = spawnSync("npm", ["ls", "--omit=dev", "--all", "--parseable"], {
-    cwd: projectRoot,
-    encoding: "utf8"
-  });
-
-  const stderr = typeof result.stderr === "string" ? result.stderr.trim() : "";
-  const stdout = typeof result.stdout === "string" ? result.stdout : "";
-
-  const lines = stdout
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  if (result.status !== 0 && lines.length === 0) {
-    throw new Error(stderr || "Failed to list production npm dependencies.");
+function readPackageLock() {
+  if (!fs.existsSync(packageLockPath)) {
+    throw new Error(`Missing package-lock.json at ${packageLockPath}`);
   }
 
-  return lines.filter((directoryPath) => directoryPath !== projectRoot);
+  return JSON.parse(fs.readFileSync(packageLockPath, "utf8"));
+}
+
+function listRuntimePackageDirectories() {
+  const packageLock = readPackageLock();
+  const packages = packageLock.packages;
+
+  if (!packages || typeof packages !== "object") {
+    throw new Error("package-lock.json does not contain a packages map.");
+  }
+
+  return Object.entries(packages)
+    .filter(([relativePath, metadata]) => {
+      if (!relativePath || !relativePath.startsWith("node_modules/")) {
+        return false;
+      }
+
+      if (metadata && typeof metadata === "object" && metadata.dev === true) {
+        return false;
+      }
+
+      return fs.existsSync(path.join(projectRoot, relativePath));
+    })
+    .map(([relativePath]) => path.join(projectRoot, relativePath));
 }
 
 function toRepoRelativePath(absolutePath) {
@@ -102,6 +112,11 @@ function copyRuntimeDependencies(relativeDirectories) {
 function main() {
   const packageDirectories = listRuntimePackageDirectories();
   const selectedDirectories = selectMinimalDirectories(packageDirectories);
+
+  if (selectedDirectories.length === 0) {
+    throw new Error("No runtime package directories were found in package-lock.json.");
+  }
+
   copyRuntimeDependencies(selectedDirectories);
   console.log(
     `Prepared runtime-only node_modules staging at ${stagingNodeModulesDir} with ${selectedDirectories.length} top-level copies.`
