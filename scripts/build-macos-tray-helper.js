@@ -9,7 +9,7 @@ const projectRoot = path.resolve(__dirname, "..");
 
 const sourcePath = path.join(projectRoot, "desktop", "macos-tray-helper.swift");
 const outputDir = path.join(projectRoot, "desktop", "bin");
-const outputPath = path.join(outputDir, "PackageRunnerTrayHelper");
+const outputPath = path.join(outputDir, "runnerTrayHelper");
 const moduleCacheDir = path.join(projectRoot, ".tmp", "swift-module-cache");
 
 function ensureXcrun() {

@@ -113,7 +113,7 @@ type RuntimeStatus = {
 };
 
 const desktopDeno = Deno as DesktopDeno;
-const appName = "PackageRunner";
+const appName = "runner";
 const launchMode = Deno.args.includes("--runner") ? "runner" : "app";
 const executableDir = path.dirname(Deno.execPath());
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
@@ -470,7 +470,7 @@ function createBootstrapServer() {
   <body>
     <section class="card">
       <p class="eyebrow">Desktop launch</p>
-      <h1>Preparing PackageRunner</h1>
+      <h1>Preparing runner</h1>
       <p>Starting the local runtime and loading the app window.</p>
     </section>
   </body>
@@ -792,7 +792,7 @@ async function main() {
   if (launchContext.child) {
     launchContext.child.status.then((status) => {
       if (!shuttingDown) {
-        console.error(`PackageRunner runtime exited with code ${status.code}.`);
+        console.error(`runner runtime exited with code ${status.code}.`);
         shutdown(status.code).catch(() => {
           Deno.exit(status.code);
         });

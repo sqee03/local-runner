@@ -91,14 +91,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     if let button = statusItem.button {
       button.image = makeStatusIcon()
       button.imagePosition = .imageOnly
-      button.toolTip = "PackageRunner"
+      button.toolTip = "runner"
     }
 
     let menu = NSMenu()
     menu.addItem(withTitle: "Open Simulator", action: #selector(openApp), keyEquivalent: "")
     menu.addItem(withTitle: "Open config", action: #selector(openRunner), keyEquivalent: "")
     menu.addItem(NSMenuItem.separator())
-    menu.addItem(withTitle: "Quit", action: #selector(quitPackageRunner), keyEquivalent: "q")
+    menu.addItem(withTitle: "Quit", action: #selector(quitRunner), keyEquivalent: "q")
 
     for item in menu.items {
       item.target = self
@@ -123,7 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     NSWorkspace.shared.open(configuration.runnerURL)
   }
 
-  @objc private func quitPackageRunner() {
+  @objc private func quitRunner() {
     kill(configuration.launcherPID, SIGTERM)
     if let shellPID = configuration.shellPID {
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {

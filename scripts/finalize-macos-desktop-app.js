@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
-const sourceAppPath = "/tmp/PackageRunner-macos-arm64.app";
-const destinationAppPath = path.join(projectRoot, "release", "mac", "PackageRunner-macos-arm64.app");
+const sourceAppPath = "/tmp/runner.app";
+const destinationAppPath = path.join(projectRoot, "release", "mac", "runner.app");
 
 function stripExtendedAttributes(targetPath) {
   const result = spawnSync("xattr", ["-cr", targetPath], {

@@ -15,10 +15,12 @@ const releaseTargets = {
 };
 
 const legacyReleaseArtifacts = [
-  path.join(releaseRoot, "PackageRunner"),
-  path.join(releaseRoot, "PackageRunner.exe"),
-  path.join(releaseRoot, "PackageRunner.dll"),
-  path.join(releaseRoot, "PackageRunner-macos-arm64.app"),
+  path.join(releaseRoot, "runner"),
+  path.join(releaseRoot, "runner.exe"),
+  path.join(releaseRoot, "runner.dll"),
+  path.join(releaseRoot, "runner.app"),
+  path.join(releaseRoot, "windows-x64"),
+  path.join(releaseRoot, "macos-arm64"),
   path.join(releaseRoot, ".DS_Store")
 ];
 

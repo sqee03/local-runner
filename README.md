@@ -13,7 +13,6 @@ This repository contains an MVP for a frontend-led local package:
 
 - Node.js 26+
 - npm 11+
-- Deno 2.9+ for Windows and Mac packaging
 
 ## Run the MVP
 
@@ -39,26 +38,12 @@ This will:
 - serve the injected frontend app on `http://127.0.0.1:4300`
 - open the control UI in the browser for local development
 
-## What the UI shows
-
-- `Hello World`
-- frontend loaded state
-- MQTT connection status
-- backend message status
-- latest message published on topic `mvp/test`
-
 ## Configuration
 
-- Shipped defaults live in [config/defaults.json](/Users/sqee/Documents/local-mqtt-app-runner/config/defaults.json)
-- Machine-specific overrides live in [config/user-overrides.json](/Users/sqee/Documents/local-mqtt-app-runner/config/user-overrides.json)
+- Shipped defaults live in [config/defaults.json](/Users/sqee/Projects/ciklum/saab/local-mqtt-app-runner/config/defaults.json)
+- Machine-specific overrides live in [config/user-overrides.json](/Users/sqee/Projects/ciklum/saab/local-mqtt-app-runner/config/user-overrides.json)
 - In the packaged desktop app, open `Config` from the tray menu
 - In browser-based local development, use the `Config` button in the top-right corner
-- The settings cover:
-  - local host/interface binding
-  - the internal control-service port
-  - FE, BE, and MQTT service ports
-  - FE, BE, and MQTT executable/entry/working-directory paths
-  - the MQTT demo topic
 - Saved overrides are applied the next time services start
 
 ## Packaged App Behavior
@@ -73,38 +58,49 @@ This will:
 
 ## Windows Packaging
 
-Build the Windows package with:
+Build the Windows desktop app with:
 
 ```bash
 npm run package:windows
 ```
 
-The build downloads the official Windows x64 Node.js runtime locally on demand into `vendor/windows-node-x64/` if it is missing.
+This now produces only the current desktop-app build in:
 
-This produces the Windows desktop app executable:
+- [release/windows/runner](/Users/sqee/Projects/ciklum/saab/local-mqtt-app-runner/release/windows/runner)
 
-- [release/PackageRunner.exe](/Users/sqee/Documents/local-mqtt-app-runner/release/PackageRunner.exe)
+Inside that folder, the launchable app is:
 
-What is embedded inside that one file:
+- [release/windows/runner/runner.exe](/Users/sqee/Projects/ciklum/saab/local-mqtt-app-runner/release/windows/runner/runner.exe)
 
-- the Node runtime from [vendor/windows-node-x64/node.exe](/Users/sqee/Documents/local-mqtt-app-runner/vendor/windows-node-x64/node.exe)
-- the built runner UI from `dist/`
+Important behavior:
+
+- `release/windows-x64` is a legacy output from the older browser-based packaging flow and should no longer be produced.
+- The current packaging cleanup removes old `release/windows-x64` leftovers before each new Windows build.
+- The Windows desktop build is the same desktop-app approach as Mac: the app opens in its own desktop window, not in the browser.
+- The Windows output is a bundled app directory, similar in spirit to a macOS `.app` bundle.
+
+What is embedded inside the Windows desktop app:
+
+- the packaged Node runtime used by the desktop shell at runtime
+- the built frontend from `dist/`
 - the injected `fe`, `be`, and `mqtt` packages
 - the runner scripts and runtime dependencies
 
-At runtime, the executable extracts its embedded payload automatically and starts the bundled services through the bundled `node.exe`. User-writable config is kept outside that extracted payload in a stable data folder so updates do not wipe overrides.
+Build-time tool behavior:
+
+- packaging auto-downloads the required Node and Deno binaries locally when missing
+- those downloads are temporary local build-tool caches under `.tmp/build-tools/`
+- they are not meant to be committed to git
 
 User config location:
 
-- preferred portable location: `<folder containing PackageRunner.exe>/PackageRunner-data/config/`
-- fallback location when the executable folder is not writable: `%LOCALAPPDATA%/PackageRunner/config/`
+- preferred portable location: `<folder containing runner.exe>/runner-data/config/`
+- fallback location when the executable folder is not writable: `%LOCALAPPDATA%/runner/config/`
 
 Files created there:
 
 - `defaults.json`
 - `user-overrides.json`
-
-`npm run package:windows:gui` currently resolves to the same packaging flow as `npm run package:windows`.
 
 ## Mac Apple Silicon Packaging
 
@@ -114,39 +110,35 @@ Build the Apple Silicon Mac app with:
 npm run package:mac:arm
 ```
 
-The build downloads the official macOS ARM64 Node.js runtime locally on demand into `vendor/macos-arm64-node/` if it is missing.
-
 This produces:
 
-- [release/PackageRunner-macos-arm64.app](/Users/sqee/Documents/local-mqtt-app-runner/release/PackageRunner-macos-arm64.app)
+- [release/mac/runner.app](/Users/sqee/Projects/ciklum/saab/local-mqtt-app-runner/release/mac/runner.app)
 
-What is embedded inside that one file:
+The Mac build uses the same desktop-app approach as Windows:
 
-- the Node runtime from [vendor/macos-arm64-node/README.md](/Users/sqee/Documents/local-mqtt-app-runner/vendor/macos-arm64-node/README.md)
-- the built runner UI from `dist/`
-- the injected `fe`, `be`, and `mqtt` packages
-- the runner scripts and runtime dependencies
+- the app opens in its own desktop window
+- FE runs inside the app window
+- config is available from the tray/menu-bar flow
+- runtime services are managed by the desktop app
 
-At runtime, the desktop app extracts its embedded payload automatically, starts the bundled services through the bundled Mac Node runtime, and loads the FE app inside the desktop window. User-writable config is kept outside that extracted payload in a stable data folder so updates do not wipe overrides.
+Build-time tool behavior:
+
+- packaging auto-downloads the required Node and Deno binaries locally when missing
+- those downloads are temporary local build-tool caches under `.tmp/build-tools/`
+- they are not meant to be committed to git
 
 User config location:
 
-- preferred portable location: `<folder containing PackageRunner-macos-arm64>/PackageRunner-data/config/`
-- fallback location when the executable folder is not writable: `~/Library/Application Support/PackageRunner/config/`
+- preferred portable location: `<folder containing runner.app>/runner-data/config/`
+- fallback location when the app bundle folder is not writable: `~/Library/Application Support/runner/config/`
 
 Files created there:
 
 - `defaults.json`
 - `user-overrides.json`
 
-Bundled runtime behavior:
-
-- runtime binaries are not meant to be committed to git
-- each packaging command vendors the required official Node runtime locally into `vendor/` before building
-- if the runtime already exists locally, it is reused
-
 Important Mac notes:
 
-- the packaging flow builds the `.app` bundle in `/tmp` and then copies it into `release/` to avoid macOS extended-attribute issues when signing directly inside iCloud/Documents-backed folders
+- the packaging flow builds the `.app` bundle in `/tmp` and then copies it into `release/mac/` to avoid macOS extended-attribute issues when signing directly inside synced folders
 - the generated app is ad-hoc signed by the Deno packaging flow
 - for smoother distribution to other Mac users, proper Apple signing and notarization is still recommended

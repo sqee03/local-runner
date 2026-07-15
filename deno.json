@@ -1,7 +1,7 @@
 {
   "tasks": {
-    "package:windows": "deno eval \"await Deno.mkdir('release/windows', { recursive: true });\" && deno desktop --no-npm --target x86_64-pc-windows-msvc --output ./release/windows/PackageRunner.exe --icon ./desktop/assets/app-icon.png --allow-read --allow-write --allow-run --allow-env --allow-net=127.0.0.1,localhost --include ./.tmp/payload-manifest.json --include ./desktop/assets ./desktop/main.ts",
+    "package:windows": "deno eval \"await Deno.mkdir('release/windows', { recursive: true });\" && deno desktop --no-npm --target x86_64-pc-windows-msvc --output ./release/windows/runner.exe --icon ./desktop/assets/app-icon.png --allow-read --allow-write --allow-run --allow-env --allow-net=127.0.0.1,localhost --include ./.tmp/payload-manifest.json --include ./desktop/assets ./desktop/main.ts",
     "package:windows:gui": "deno task package:windows",
-    "package:mac:arm": "deno eval \"await Deno.mkdir('release/mac', { recursive: true });\" && deno desktop --no-npm --target aarch64-apple-darwin --output /tmp/PackageRunner-macos-arm64.app --icon ./desktop/assets/app-icon.png --allow-read --allow-write --allow-run --allow-env --allow-net=127.0.0.1,localhost --include ./.tmp/payload-manifest.json --include ./desktop/assets ./desktop/main.ts"
+    "package:mac:arm": "deno eval \"await Deno.mkdir('release/mac', { recursive: true });\" && deno desktop --no-npm --target aarch64-apple-darwin --output /tmp/runner.app --icon ./desktop/assets/app-icon.png --allow-read --allow-write --allow-run --allow-env --allow-net=127.0.0.1,localhost --include ./.tmp/payload-manifest.json --include ./desktop/assets ./desktop/main.ts"
   }
 }
