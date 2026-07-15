@@ -77,16 +77,13 @@ function extractZipArchive(archivePath, destinationDir, label) {
       throw new Error(`Failed to extract ${label}: PowerShell is not available on PATH.`);
     }
 
+    const escapedArchivePath = archivePath.replaceAll("'", "''");
+    const escapedDestinationDir = destinationDir.replaceAll("'", "''");
+    const command = `Expand-Archive -LiteralPath '${escapedArchivePath}' -DestinationPath '${escapedDestinationDir}' -Force`;
+
     const result = spawnSync(
       powerShellCommand,
-      [
-        "-NoProfile",
-        "-NonInteractive",
-        "-Command",
-        "Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force",
-        archivePath,
-        destinationDir
-      ],
+      ["-NoProfile", "-NonInteractive", "-Command", command],
       { stdio: "inherit" }
     );
 
