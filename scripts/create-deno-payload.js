@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
-const outputPath = path.join(projectRoot, "release", "payload-manifest.json");
+const outputPath = path.join(projectRoot, ".tmp", "payload-manifest.json");
 const runtimeNodeModulesSource = path.join(
   projectRoot,
   ".tmp",

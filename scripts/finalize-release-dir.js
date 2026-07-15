@@ -6,7 +6,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 
-fs.rmSync(path.join(projectRoot, "release", "payload-manifest.json"), {
+fs.rmSync(path.join(projectRoot, ".tmp", "payload-manifest.json"), {
   recursive: true,
   force: true
 });

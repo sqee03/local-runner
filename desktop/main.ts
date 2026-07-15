@@ -117,7 +117,7 @@ const appName = "PackageRunner";
 const launchMode = Deno.args.includes("--runner") ? "runner" : "app";
 const executableDir = path.dirname(Deno.execPath());
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
-const bundledPayloadPath = path.join(moduleDir, "..", "release", "payload-manifest.json");
+const bundledPayloadPath = path.join(moduleDir, "..", ".tmp", "payload-manifest.json");
 const desktopWindowDefaults = {
   width: 1440,
   height: 920

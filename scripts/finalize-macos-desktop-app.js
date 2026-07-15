@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const sourceAppPath = "/tmp/PackageRunner-macos-arm64.app";
-const destinationAppPath = path.join(projectRoot, "release", "PackageRunner-macos-arm64.app");
+const destinationAppPath = path.join(projectRoot, "release", "mac", "PackageRunner-macos-arm64.app");
 
 function stripExtendedAttributes(targetPath) {
   const result = spawnSync("xattr", ["-cr", targetPath], {
@@ -24,6 +24,7 @@ function main() {
     throw new Error(`Missing packaged Mac app at ${sourceAppPath}`);
   }
 
+  fs.mkdirSync(path.dirname(destinationAppPath), { recursive: true });
   fs.rmSync(destinationAppPath, { recursive: true, force: true });
   fs.cpSync(sourceAppPath, destinationAppPath, {
     recursive: true

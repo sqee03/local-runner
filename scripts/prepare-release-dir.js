@@ -6,15 +6,34 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const releaseRoot = path.join(projectRoot, "release");
+const tempRoot = path.join(projectRoot, ".tmp");
+const target = process.argv[2];
 
-const stalePaths = [
-  path.join(releaseRoot, "PackageRunner-data"),
-  path.join(releaseRoot, "payload-manifest.json"),
-  path.join(projectRoot, ".tmp", "runtime-node_modules")
+const releaseTargets = {
+  windows: path.join(releaseRoot, "windows"),
+  "mac-arm64": path.join(releaseRoot, "mac")
+};
+
+const legacyReleaseArtifacts = [
+  path.join(releaseRoot, "PackageRunner"),
+  path.join(releaseRoot, "PackageRunner.exe"),
+  path.join(releaseRoot, "PackageRunner.dll"),
+  path.join(releaseRoot, "PackageRunner-macos-arm64.app"),
+  path.join(releaseRoot, ".DS_Store")
 ];
 
-for (const stalePath of stalePaths) {
-  fs.rmSync(stalePath, { recursive: true, force: true });
+if (!target || !releaseTargets[target]) {
+  throw new Error(`Unknown release target: ${target ?? "<missing>"}`);
 }
 
+for (const artifactPath of legacyReleaseArtifacts) {
+  fs.rmSync(artifactPath, { recursive: true, force: true });
+}
+
+fs.rmSync(releaseTargets[target], { recursive: true, force: true });
+fs.rmSync(path.join(tempRoot, "runtime-node_modules"), { recursive: true, force: true });
+fs.rmSync(path.join(tempRoot, "payload-manifest.json"), { recursive: true, force: true });
+
 fs.mkdirSync(releaseRoot, { recursive: true });
+fs.mkdirSync(releaseTargets[target], { recursive: true });
+fs.mkdirSync(tempRoot, { recursive: true });
