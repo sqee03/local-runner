@@ -23,11 +23,14 @@ function listRuntimePackageDirectories() {
     encoding: "utf8"
   });
 
+  const stderr = typeof result.stderr === "string" ? result.stderr.trim() : "";
+  const stdout = typeof result.stdout === "string" ? result.stdout : "";
+
   if (result.status !== 0) {
-    throw new Error(result.stderr.trim() || "Failed to list production npm dependencies.");
+    throw new Error(stderr || "Failed to list production npm dependencies.");
   }
 
-  const lines = result.stdout
+  const lines = stdout
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
