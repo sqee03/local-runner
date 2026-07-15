@@ -9,7 +9,8 @@ const releaseRoot = path.join(projectRoot, "release");
 
 const stalePaths = [
   path.join(releaseRoot, "PackageRunner-data"),
-  path.join(releaseRoot, "payload-manifest.json")
+  path.join(releaseRoot, "payload-manifest.json"),
+  path.join(projectRoot, ".tmp", "runtime-node_modules")
 ];
 
 for (const stalePath of stalePaths) {
