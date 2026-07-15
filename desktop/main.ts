@@ -124,9 +124,33 @@ const desktopWindowDefaults = {
 };
 let activeDesktopWindow: DesktopBrowserWindow | null = null;
 let activeDesktopTray: DesktopTray | null = null;
+let diagnosticLogPath: string | null = null;
 
 function ensureDirectory(directoryPath: string) {
   fs.mkdirSync(directoryPath, { recursive: true });
+}
+
+function writeDiagnosticLog(message: string) {
+  if (!diagnosticLogPath) {
+    return;
+  }
+
+  try {
+    fs.appendFileSync(diagnosticLogPath, `[${new Date().toISOString()}] ${message}
+`, "utf8");
+  } catch {
+    // Ignore logging failures.
+  }
+}
+
+function addExitSignalListeners(handler: () => void) {
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    try {
+      Deno.addSignalListener(signal, handler);
+    } catch {
+      // Some desktop targets may not support every signal.
+    }
+  }
 }
 
 function canWriteToDirectory(directoryPath: string) {
@@ -723,10 +747,13 @@ async function setupDesktopShell(
 async function main() {
   const payload = loadPayloadManifest();
   const userDataDir = resolveUserDataDir();
+  diagnosticLogPath = path.join(userDataDir, "desktop.log");
+  writeDiagnosticLog("Desktop startup begin.");
   const payloadRoot = path.join(userDataDir, "runtime", payload.hash);
   const shellMode: "desktop" | "browser" = supportsDesktopShell() ? "desktop" : "browser";
 
   extractPayload(payloadRoot, payload);
+  writeDiagnosticLog(`Payload extracted to ${payloadRoot}.`);
 
   const projectRoot = payloadRoot;
   const nodeExecutable = resolveNodeRuntimePath(projectRoot);
@@ -751,6 +778,7 @@ async function main() {
     effectiveConfig,
     shellMode
   );
+  writeDiagnosticLog(`Runner launch context ready. attached=${launchContext.attachedToExistingRunner}`);
 
   let shuttingDown = false;
 
@@ -792,7 +820,9 @@ async function main() {
   if (launchContext.child) {
     launchContext.child.status.then((status) => {
       if (!shuttingDown) {
-        console.error(`runner runtime exited with code ${status.code}.`);
+        const message = `runner runtime exited with code ${status.code}.`;
+        console.error(message);
+        writeDiagnosticLog(message);
         shutdown(status.code).catch(() => {
           Deno.exit(status.code);
         });
@@ -802,6 +832,7 @@ async function main() {
 
   if (shellMode === "desktop") {
     await setupDesktopShell(projectRoot, launchContext, shutdown);
+    writeDiagnosticLog("Desktop shell initialized.");
 
     const forwardSignal = () => {
       shutdown(0).catch(() => {
@@ -809,9 +840,8 @@ async function main() {
       });
     };
 
-    Deno.addSignalListener("SIGINT", forwardSignal);
-    Deno.addSignalListener("SIGTERM", forwardSignal);
-    return;
+    addExitSignalListeners(forwardSignal);
+    await new Promise<void>(() => {});
   }
 
   const runtimeReady = await waitForUrl(`${launchContext.runnerUrl}/api/runtime`, 20000);
@@ -845,5 +875,6 @@ async function main() {
 
 main().catch((error) => {
   console.error(error.message);
+  writeDiagnosticLog(`Fatal startup error: ${error.message}`);
   Deno.exit(1);
 });
