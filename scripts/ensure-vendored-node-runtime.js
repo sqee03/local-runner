@@ -18,14 +18,7 @@ const runtimeConfigs = {
     archiveFileName: `node-${nodeVersion}-win-x64.zip`,
     downloadUrl: `https://nodejs.org/dist/${nodeVersion}/node-${nodeVersion}-win-x64.zip`,
     extract(archivePath, destinationDir) {
-      ensureCommand("unzip");
-      const result = spawnSync("unzip", ["-oq", archivePath, "-d", destinationDir], {
-        stdio: "inherit"
-      });
-
-      if (result.status !== 0) {
-        throw new Error("Failed to extract Windows Node runtime archive.");
-      }
+      extractZipArchive(archivePath, destinationDir, "Windows Node runtime archive");
     },
     finalize(destinationDir) {
       flattenSingleExtractedDirectory(destinationDir);
@@ -59,6 +52,58 @@ function ensureCommand(commandName) {
 
   if (result.error && result.error.code === "ENOENT") {
     throw new Error(`Required command "${commandName}" is not available on PATH.`);
+  }
+}
+
+function getAvailableCommand(commandNames) {
+  for (const commandName of commandNames) {
+    const result = spawnSync(commandName, ["-Command", "$PSVersionTable.PSVersion.ToString()"], {
+      stdio: "ignore"
+    });
+
+    if (!result.error || result.error.code !== "ENOENT") {
+      return commandName;
+    }
+  }
+
+  return null;
+}
+
+function extractZipArchive(archivePath, destinationDir, label) {
+  if (process.platform === "win32") {
+    const powerShellCommand = getAvailableCommand(["powershell.exe", "powershell", "pwsh.exe", "pwsh"]);
+
+    if (!powerShellCommand) {
+      throw new Error(`Failed to extract ${label}: PowerShell is not available on PATH.`);
+    }
+
+    const result = spawnSync(
+      powerShellCommand,
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "Expand-Archive -LiteralPath $args[0] -DestinationPath $args[1] -Force",
+        archivePath,
+        destinationDir
+      ],
+      { stdio: "inherit" }
+    );
+
+    if (result.status !== 0) {
+      throw new Error(`Failed to extract ${label}.`);
+    }
+
+    return;
+  }
+
+  ensureCommand("unzip");
+  const result = spawnSync("unzip", ["-oq", archivePath, "-d", destinationDir], {
+    stdio: "inherit"
+  });
+
+  if (result.status !== 0) {
+    throw new Error(`Failed to extract ${label}.`);
   }
 }
 
