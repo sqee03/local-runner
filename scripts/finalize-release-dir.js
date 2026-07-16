@@ -11,6 +11,11 @@ fs.rmSync(path.join(projectRoot, ".tmp", "payload-manifest.json"), {
   force: true
 });
 
+fs.rmSync(path.join(projectRoot, ".tmp", "packaged-runtime"), {
+  recursive: true,
+  force: true
+});
+
 fs.rmSync(path.join(projectRoot, ".tmp", "runtime-node_modules"), {
   recursive: true,
   force: true

@@ -42,6 +42,7 @@ for (const artifactPath of legacyReleaseArtifacts) {
 }
 
 removePath(releaseTargets[target]);
+removePath(path.join(tempRoot, "packaged-runtime"));
 removePath(path.join(tempRoot, "runtime-node_modules"));
 removePath(path.join(tempRoot, "payload-manifest.json"));
 

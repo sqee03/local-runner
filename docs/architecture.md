@@ -29,7 +29,8 @@ desktop routes `/desktop/simulator` and `/desktop/config`.
    existing extraction when the hash matches.
 3. It copies the shipped defaults to the persistent config directory and reads
    user overrides.
-4. It starts the bundled Node runtime against `scripts/mvp-orchestrator.js`, or
+4. It starts the bundled Node runtime against the generated
+   `scripts/mvp-orchestrator.js` bundle, or
    attaches to an already-running runner on the configured port.
 5. It waits for the runner API, starts services for a normal app launch, and
    navigates the desktop window to the appropriate route.
@@ -47,9 +48,10 @@ The npm and full Deno packaging tasks run the same stages:
 2. Generate the target app icon.
 3. Prepare the target release directory.
 4. Cache the target Node and Deno build tools under `.tmp/build-tools/`.
-5. Stage only production Node dependencies.
-6. Create the payload manifest containing runtime code, assets, configuration,
-   dependencies, and the target Node binary.
+5. Bundle and minify the Node entrypoints and injected browser assets into
+   `.tmp/packaged-runtime/`.
+6. Create the payload manifest containing generated bundles, static assets,
+   configuration, and the target Node binary.
 7. Run the target-specific `deno desktop` compile task.
 8. Normalize the output into `release/windows/runner/` or
    `release/mac/runner.app` and remove transient payload staging.
@@ -72,3 +74,8 @@ workspace.
 Target runtimes are not tracked under `vendor/`. During payload creation, files
 from `.tmp/build-tools/` are mapped to the `vendor/` paths expected by the
 packaged launcher.
+
+Editable files under `scripts/` and `injections/` are development inputs only.
+The packaged runtime keeps the same entrypoint paths for configuration
+compatibility, but those files are minified bundles containing their required
+dependencies. No loose runtime `node_modules/` directory is included.

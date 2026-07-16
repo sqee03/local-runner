@@ -68,8 +68,9 @@ npm run package:windows
 ```
 
 The launchable artifact is `release/windows/runner/runner.exe`. The package
-includes the Node runtime, built UI, injected services, runner scripts, and
-runtime dependencies. It does not require Node or npm on the target machine.
+includes the Node runtime, built UI, and minified service bundles. It does not
+include the editable service sources or a loose `node_modules` tree, and does
+not require Node or npm on the target machine.
 
 Build the Apple Silicon macOS app:
 
@@ -95,6 +96,12 @@ packaging pipeline. `package:win` is the explicit CEF-backed Windows variant.
 Packaging stores downloaded build tools and intermediate payloads under `.tmp/`.
 Generated application artifacts are written under `release/`; both directories
 are intentionally ignored by Git.
+
+The packaging pipeline bundles and minifies the runner, frontend server,
+backend, MQTT broker, and injected browser script with esbuild. Original source
+files remain unchanged in `scripts/` and `injections/` for development. Bundling
+reduces casual source exposure but should not be treated as encryption or as
+protection against determined reverse engineering.
 
 ## Desktop Behavior
 

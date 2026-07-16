@@ -7,12 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const outputPath = path.join(projectRoot, ".tmp", "payload-manifest.json");
-const runtimeNodeModulesSource = path.join(
-  projectRoot,
-  ".tmp",
-  "runtime-node_modules",
-  "node_modules"
-);
+const packagedRuntimeSource = path.join(projectRoot, ".tmp", "packaged-runtime");
 
 const target = process.argv[2];
 
@@ -50,7 +45,7 @@ const requiredRuntimeFiles = {
 
 const baseSources = [
   {
-    source: "config",
+    source: path.relative(projectRoot, path.join(packagedRuntimeSource, "config")),
     target: "config"
   },
   {
@@ -58,23 +53,19 @@ const baseSources = [
     target: "desktop/assets"
   },
   {
-    source: "dist",
+    source: path.relative(projectRoot, path.join(packagedRuntimeSource, "dist")),
     target: "dist"
   },
   {
-    source: "injections",
+    source: path.relative(projectRoot, path.join(packagedRuntimeSource, "injections")),
     target: "injections"
   },
   {
-    source: path.relative(projectRoot, runtimeNodeModulesSource),
-    target: "node_modules"
-  },
-  {
-    source: "package.json",
+    source: path.relative(projectRoot, path.join(packagedRuntimeSource, "package.json")),
     target: "package.json"
   },
   {
-    source: "scripts",
+    source: path.relative(projectRoot, path.join(packagedRuntimeSource, "scripts")),
     target: "scripts"
   }
 ];
