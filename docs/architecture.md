@@ -54,11 +54,15 @@ The npm and full Deno packaging tasks run the same stages:
    configuration, and the target Node binary.
 7. Run the target-specific `deno desktop` compile task.
 8. Normalize the output into `release/windows/runner/` or
-   `release/mac/runner.app` and remove transient payload staging.
+   `release/mac/runner.app` and remove transient payload staging. The Windows
+   release keeps only the forwarding `runner.exe` at its root and groups the
+   generated CEF desktop bundle under `runner/app/`.
 
 The Windows desktop launcher uses the GUI-subsystem `nodew.exe` for its child
 orchestrator so no console window appears. The regular `node.exe` remains in the
-payload for browser/debug execution. The macOS build is assembled in `/tmp`
+payload for browser/debug execution. A separate GUI-only root launcher forwards
+arguments to `app/runner.exe`, allowing the CEF DLLs and resources to remain
+beside the executable that loads them. The macOS build is assembled in `/tmp`
 before being copied to `release/mac/` to avoid extended-attribute issues in the
 workspace.
 

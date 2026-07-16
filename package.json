@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "runner": "npm run build && node scripts/mvp-orchestrator.js",
-    "package:windows": "npm run build && node scripts/build-windows-icon.js && node scripts/prepare-release-dir.js windows && node scripts/ensure-vendored-node-runtime.js windows && node scripts/ensure-vendored-deno-runtime.js windows && node scripts/prepare-packaged-runtime.js && node scripts/create-deno-payload.js windows && node scripts/run-deno-task.js compile:windows windows && node scripts/finalize-release-dir.js",
+    "package:windows": "npm run build && node scripts/build-windows-icon.js && node scripts/prepare-release-dir.js windows && node scripts/ensure-vendored-node-runtime.js windows && node scripts/ensure-vendored-deno-runtime.js windows && node scripts/prepare-packaged-runtime.js && node scripts/create-deno-payload.js windows && node scripts/run-deno-task.js compile:windows windows && node scripts/group-windows-release.js && node scripts/run-deno-task.js compile:windows:launcher windows && node scripts/finalize-release-dir.js",
     "package:windows:gui": "npm run package:windows",
     "package:mac:arm": "npm run build && node scripts/build-macos-icon.js && node scripts/prepare-release-dir.js mac-arm64 && node scripts/ensure-vendored-node-runtime.js mac-arm64 && node scripts/ensure-vendored-deno-runtime.js mac-arm64 && node scripts/prepare-packaged-runtime.js && node scripts/create-deno-payload.js mac-arm64 && node scripts/run-deno-task.js compile:mac:arm mac-arm64 && node scripts/finalize-macos-desktop-app.js && node scripts/finalize-release-dir.js"
   },

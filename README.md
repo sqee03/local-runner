@@ -53,7 +53,7 @@ directory and keeps user overrides there:
 
 | Platform | Preferred location | Fallback location |
 | --- | --- | --- |
-| Windows | `<runner.exe directory>/runner-data/config/` | `%LOCALAPPDATA%/runner/config/` |
+| Windows | `<package directory>/app/runner-data/config/` | `%LOCALAPPDATA%/runner/config/` |
 | macOS | `<runner.app>/Contents/MacOS/runner-data/config/` | `~/Library/Application Support/runner/config/` |
 
 The desktop launcher writes startup diagnostics to `desktop.log` in the same
@@ -67,10 +67,12 @@ Build the Windows x64 app directory:
 npm run package:windows
 ```
 
-The launchable artifact is `release/windows/runner/runner.exe`. The package
-includes the Node runtime, built UI, and minified service bundles. It does not
-include the editable service sources or a loose `node_modules` tree, and does
-not require Node or npm on the target machine.
+The launchable artifact is `release/windows/runner/runner.exe`. Supporting CEF
+and application files are grouped under `release/windows/runner/app/`; keep that
+folder beside `runner.exe` when distributing the app. The package includes the
+Node runtime, built UI, and minified service bundles. It does not include the
+editable service sources or a loose `node_modules` tree, and does not require
+Node or npm on the target machine.
 
 Build the Apple Silicon macOS app:
 
