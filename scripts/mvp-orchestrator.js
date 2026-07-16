@@ -126,21 +126,27 @@ function openBrowser(url) {
   }
 
   const platform = process.platform;
+  let childProcess = null;
 
-  if (platform === "win32") {
-    spawn("cmd", ["/c", "start", "", url], {
-      stdio: "ignore",
-      detached: true
-    }).unref();
-    return;
+  try {
+    if (platform === "win32") {
+      childProcess = spawn("cmd", ["/c", "start", "", url], {
+        stdio: "ignore",
+        detached: true
+      });
+    } else if (platform === "darwin") {
+      childProcess = spawn("open", [url], { stdio: "ignore", detached: true });
+    } else {
+      childProcess = spawn("xdg-open", [url], { stdio: "ignore", detached: true });
+    }
+
+    childProcess.on("error", (error) => {
+      console.error(`Failed to open browser for ${url}: ${error.message}`);
+    });
+    childProcess.unref();
+  } catch (error) {
+    console.error(`Failed to open browser for ${url}: ${error.message}`);
   }
-
-  if (platform === "darwin") {
-    spawn("open", [url], { stdio: "ignore", detached: true }).unref();
-    return;
-  }
-
-  spawn("xdg-open", [url], { stdio: "ignore", detached: true }).unref();
 }
 
 function waitForHttpReady(url, timeoutMs = 15000) {

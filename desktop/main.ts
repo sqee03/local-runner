@@ -452,29 +452,35 @@ function resolvePortOverrides(config: EffectiveConfig): PortOverrides {
 }
 
 function openBrowser(url: string) {
-  if (Deno.build.os === "windows") {
-    new Deno.Command("cmd", {
-      args: ["/c", "start", "", url],
-      stdout: "null",
-      stderr: "null"
-    }).spawn();
-    return;
-  }
+  try {
+    if (Deno.build.os === "windows") {
+      new Deno.Command("cmd", {
+        args: ["/c", "start", "", url],
+        stdout: "null",
+        stderr: "null"
+      }).spawn();
+      return;
+    }
 
-  if (Deno.build.os === "darwin") {
-    new Deno.Command("open", {
+    if (Deno.build.os === "darwin") {
+      new Deno.Command("open", {
+        args: [url],
+        stdout: "null",
+        stderr: "null"
+      }).spawn();
+      return;
+    }
+
+    new Deno.Command("xdg-open", {
       args: [url],
       stdout: "null",
       stderr: "null"
     }).spawn();
-    return;
+  } catch (error) {
+    const message = `Browser launch failed for ${url}: ${error instanceof Error ? error.message : String(error)}`;
+    console.error(message);
+    writeDiagnosticLog(message);
   }
-
-  new Deno.Command("xdg-open", {
-    args: [url],
-    stdout: "null",
-    stderr: "null"
-  }).spawn();
 }
 
 function supportsDesktopShell() {
