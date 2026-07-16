@@ -335,6 +335,38 @@ function spawnPackage(packageName, definition) {
   return childProcess;
 }
 
+function waitForChildExit(childProcess, timeoutMs) {
+  return new Promise((resolve) => {
+    if (childProcess.exitCode !== null || childProcess.signalCode !== null) {
+      resolve(true);
+      return;
+    }
+
+    const handleExit = () => {
+      clearTimeout(timeoutId);
+      resolve(true);
+    };
+
+    const timeoutId = setTimeout(() => {
+      childProcess.off("exit", handleExit);
+      resolve(false);
+    }, timeoutMs);
+
+    childProcess.once("exit", handleExit);
+  });
+}
+
+function terminateChildProcess(childProcess) {
+  for (const signal of ["SIGTERM", "SIGKILL"]) {
+    try {
+      childProcess.kill(signal);
+      return;
+    } catch {
+      // Ignore unsupported signals and continue to the next option.
+    }
+  }
+}
+
 async function stopProcess(packageName) {
   const childProcess = runtimeState.packageProcesses[packageName];
   if (!childProcess) {
@@ -344,8 +376,14 @@ async function stopProcess(packageName) {
 
   runtimeState.packageProcesses[packageName] = null;
   runtimeState.packageStatus[packageName] = "stopping";
-  childProcess.kill();
-  await new Promise((resolve) => childProcess.once("exit", resolve));
+  terminateChildProcess(childProcess);
+
+  const exitedGracefully = await waitForChildExit(childProcess, 1500);
+  if (!exitedGracefully) {
+    terminateChildProcess(childProcess);
+    await waitForChildExit(childProcess, 3000);
+  }
+
   runtimeState.packageStatus[packageName] = "stopped";
 }
 

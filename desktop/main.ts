@@ -153,6 +153,19 @@ function addExitSignalListeners(handler: () => void) {
   }
 }
 
+function terminateChildProcess(child: Deno.ChildProcess) {
+  const signals: Array<"SIGTERM" | "SIGKILL"> = ["SIGTERM", "SIGKILL"];
+
+  for (const signal of signals) {
+    try {
+      child.kill(signal);
+      return;
+    } catch {
+      // Some targets, especially Windows, do not support every signal consistently.
+    }
+  }
+}
+
 function canWriteToDirectory(directoryPath: string) {
   try {
     ensureDirectory(directoryPath);
@@ -165,26 +178,56 @@ function canWriteToDirectory(directoryPath: string) {
   }
 }
 
-function resolveUserDataDir() {
-  const portableDir = path.join(executableDir, `${appName}-data`);
-  if (canWriteToDirectory(portableDir)) {
-    return portableDir;
-  }
+function resolveWritableDirectory(candidateDirs: Array<string | null | undefined>) {
+  for (const candidateDir of candidateDirs) {
+    if (!candidateDir) {
+      continue;
+    }
 
-  const localAppData = Deno.env.get("LOCALAPPDATA");
-  if (localAppData) {
-    const fallbackDir = path.join(localAppData, appName);
-    if (canWriteToDirectory(fallbackDir)) {
-      return fallbackDir;
+    if (canWriteToDirectory(candidateDir)) {
+      return candidateDir;
     }
   }
 
+  return null;
+}
+
+function resolveUserDataDir() {
+  const portableDir = path.join(executableDir, `${appName}-data`);
+  const portableWritableDir = resolveWritableDirectory([portableDir]);
+  if (portableWritableDir) {
+    return portableWritableDir;
+  }
+
+  const localAppData = Deno.env.get("LOCALAPPDATA");
+  const userProfile = Deno.env.get("USERPROFILE");
   const homeDir = Deno.env.get("HOME");
+  const windowsFallbackDir = userProfile
+    ? path.join(userProfile, "AppData", "Local", appName)
+    : null;
+  const genericHomeFallbackDir = homeDir ? path.join(homeDir, `.${appName}`) : null;
+
+  const writableFallbackDir = resolveWritableDirectory([
+    localAppData ? path.join(localAppData, appName) : null,
+    windowsFallbackDir
+  ]);
+  if (writableFallbackDir) {
+    return writableFallbackDir;
+  }
+
   if (Deno.build.os === "darwin" && homeDir) {
     const macAppSupportDir = path.join(homeDir, "Library", "Application Support", appName);
     if (canWriteToDirectory(macAppSupportDir)) {
       return macAppSupportDir;
     }
+  }
+
+  const tempFallbackDir = resolveWritableDirectory([
+    genericHomeFallbackDir,
+    path.join(Deno.makeTempDirSync(), appName)
+  ]);
+  if (tempFallbackDir) {
+    return tempFallbackDir;
   }
 
   return path.join(Deno.cwd(), `${appName}-data`);
@@ -790,11 +833,7 @@ async function main() {
     shuttingDown = true;
 
     if (launchContext.child) {
-      try {
-        launchContext.child.kill("SIGTERM");
-      } catch {
-        // Child may already be gone.
-      }
+      terminateChildProcess(launchContext.child);
 
       await launchContext.child.status.catch(() => null);
     }
@@ -867,8 +906,7 @@ async function main() {
     });
   };
 
-  Deno.addSignalListener("SIGINT", forwardSignal);
-  Deno.addSignalListener("SIGTERM", forwardSignal);
+  addExitSignalListeners(forwardSignal);
   const status = await launchContext.child.status;
   Deno.exit(status.code);
 }
