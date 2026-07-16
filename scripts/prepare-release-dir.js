@@ -28,13 +28,22 @@ if (!target || !releaseTargets[target]) {
   throw new Error(`Unknown release target: ${target ?? "<missing>"}`);
 }
 
-for (const artifactPath of legacyReleaseArtifacts) {
-  fs.rmSync(artifactPath, { recursive: true, force: true });
+function removePath(targetPath) {
+  fs.rmSync(targetPath, {
+    recursive: true,
+    force: true,
+    maxRetries: 5,
+    retryDelay: 100
+  });
 }
 
-fs.rmSync(releaseTargets[target], { recursive: true, force: true });
-fs.rmSync(path.join(tempRoot, "runtime-node_modules"), { recursive: true, force: true });
-fs.rmSync(path.join(tempRoot, "payload-manifest.json"), { recursive: true, force: true });
+for (const artifactPath of legacyReleaseArtifacts) {
+  removePath(artifactPath);
+}
+
+removePath(releaseTargets[target]);
+removePath(path.join(tempRoot, "runtime-node_modules"));
+removePath(path.join(tempRoot, "payload-manifest.json"));
 
 fs.mkdirSync(releaseRoot, { recursive: true });
 fs.mkdirSync(releaseTargets[target], { recursive: true });
