@@ -1,144 +1,122 @@
-# Local MQTT App Runner MVP
+# Local MQTT App Runner
 
-This repository contains an MVP for a frontend-led local package:
+Local desktop runner for a React frontend, a Node-based MQTT broker, and a
+backend publisher. The packaged application embeds the runtime and opens the
+frontend in a native Deno desktop window; a browser-based flow remains available
+for local development.
 
-- a React app served locally
-- a bundled MQTT broker with WebSocket support
-- a backend stub that publishes a test message
-- a desktop launcher that starts everything and presents the experience as a desktop app
-- a Config view backed by local JSON files for defaults and user overrides
-- a Deno-packaged launcher that embeds Node for local Windows and Mac distribution
+## Requirements
 
-## Prerequisites
+- Node.js 26 or newer
+- npm 11 or newer
+- macOS is required to produce the Apple Silicon app
 
-- Node.js 26+
-- npm 11+
+Packaging downloads target-specific Node and Deno binaries when they are not
+already cached. The npm packaging commands do not require a global Deno
+installation; a global Deno installation is required to invoke any `deno task`
+command.
 
-## Run the MVP
+## Development
 
-1. Install dependencies:
+Install dependencies and start the complete local runtime:
 
 ```bash
 npm install
-```
-
-2. Start the full local runtime:
-
-```bash
 npm run runner
 ```
 
-This will:
+`npm run runner` builds the React control UI, starts the MQTT broker and the
+injected backend/frontend services, then opens the control UI in the default
+browser.
 
-- build the React app into `dist/`
-- start the local MQTT broker on `127.0.0.1:18883`
-- expose MQTT over WebSockets on `ws://127.0.0.1:19001`
-- start the backend publisher
-- serve the desktop control UI on `http://127.0.0.1:4173`
-- serve the injected frontend app on `http://127.0.0.1:4300`
-- open the control UI in the browser for local development
+The default local endpoints are:
+
+| Service | Endpoint |
+| --- | --- |
+| Runner UI | `http://127.0.0.1:4173` |
+| Injected frontend | `http://127.0.0.1:4300` |
+| MQTT TCP | `mqtt://127.0.0.1:18883` |
+| MQTT WebSocket | `ws://127.0.0.1:19001` |
+
+Use `npm run dev` when only the Vite UI is needed. `npm run build` creates the
+web assets in `dist/`.
 
 ## Configuration
 
-- Shipped defaults live in [config/defaults.json](/Users/sqee/Projects/ciklum/saab/local-mqtt-app-runner/config/defaults.json)
-- Machine-specific overrides live in [config/user-overrides.json](/Users/sqee/Projects/ciklum/saab/local-mqtt-app-runner/config/user-overrides.json)
-- In the packaged desktop app, open `Config` from the tray menu
-- In browser-based local development, use the `Config` button in the top-right corner
-- Saved overrides are applied the next time services start
+Shipped defaults live in `config/defaults.json`; development overrides live in
+`config/user-overrides.json`. Overrides are merged over defaults and take effect
+the next time the services start.
 
-## Packaged App Behavior
+In a packaged app, configuration is managed from the tray menu or by launching
+the app with `--runner`. The launcher copies defaults into a writable data
+directory and keeps user overrides there:
 
-- Launching the packaged app normally starts the internal control service in the background, starts MQTT/BE/FE automatically, and opens the FE app inside the desktop window.
-- The FE app fills the main desktop window when services are running.
-- Launch the same packaged app with `--runner` to open directly into the Config view.
-- A tray icon stays available with quick actions for `Open app`, `Open config`, `Start services` or `Stop services`, and `Quit`.
-- Left-clicking the tray icon focuses the app window.
-- Right-clicking the tray icon opens the native tray menu.
-- `Quit` closes the desktop shell and stops the managed runtime started by that app instance.
+| Platform | Preferred location | Fallback location |
+| --- | --- | --- |
+| Windows | `<runner.exe directory>/runner-data/config/` | `%LOCALAPPDATA%/runner/config/` |
+| macOS | `<runner.app>/Contents/MacOS/runner-data/config/` | `~/Library/Application Support/runner/config/` |
 
-## Windows Packaging
+The desktop launcher writes startup diagnostics to `desktop.log` in the same
+`runner-data` directory.
 
-Build the Windows desktop app with:
+## Packaging
+
+Build the Windows x64 app directory:
 
 ```bash
 npm run package:windows
 ```
 
-This now produces only the current desktop-app build in:
+The launchable artifact is `release/windows/runner/runner.exe`. The package
+includes the Node runtime, built UI, injected services, runner scripts, and
+runtime dependencies. It does not require Node or npm on the target machine.
 
-- [release/windows/runner](/Users/sqee/Projects/ciklum/saab/local-mqtt-app-runner/release/windows/runner)
-
-Inside that folder, the launchable app is:
-
-- [release/windows/runner/runner.exe](/Users/sqee/Projects/ciklum/saab/local-mqtt-app-runner/release/windows/runner/runner.exe)
-
-Important behavior:
-
-- `release/windows-x64` is a legacy output from the older browser-based packaging flow and should no longer be produced.
-- The current packaging cleanup removes old `release/windows-x64` leftovers before each new Windows build.
-- The Windows desktop build is the same desktop-app approach as Mac: the app opens in its own desktop window, not in the browser.
-- The Windows output is a bundled app directory, similar in spirit to a macOS `.app` bundle.
-
-What is embedded inside the Windows desktop app:
-
-- the packaged Node runtime used by the desktop shell at runtime
-- the built frontend from `dist/`
-- the injected `fe`, `be`, and `mqtt` packages
-- the runner scripts and runtime dependencies
-
-Build-time tool behavior:
-
-- packaging auto-downloads the required Node and Deno binaries locally when missing
-- those downloads are temporary local build-tool caches under `.tmp/build-tools/`
-- they are not meant to be committed to git
-
-User config location:
-
-- preferred portable location: `<folder containing runner.exe>/runner-data/config/`
-- fallback location when the executable folder is not writable: `%LOCALAPPDATA%/runner/config/`
-
-Files created there:
-
-- `defaults.json`
-- `user-overrides.json`
-
-## Mac Apple Silicon Packaging
-
-Build the Apple Silicon Mac app with:
+Build the Apple Silicon macOS app:
 
 ```bash
 npm run package:mac:arm
 ```
 
-This produces:
+The artifact is `release/mac/runner.app`. The build is ad-hoc signed by the Deno
+packaging flow; external distribution still requires an Apple Developer signing
+identity and notarization.
 
-- [release/mac/runner.app](/Users/sqee/Projects/ciklum/saab/local-mqtt-app-runner/release/mac/runner.app)
+The equivalent full packaging tasks can be run with Deno:
 
-The Mac build uses the same desktop-app approach as Windows:
+```bash
+deno task package:windows
+deno task package:mac:arm
+```
 
-- the app opens in its own desktop window
-- FE runs inside the app window
-- config is available from the tray/menu-bar flow
-- runtime services are managed by the desktop app
+The `compile:windows` and `compile:mac:arm` Deno tasks are internal compile-only
+steps. They expect the payload manifest and runtime caches prepared by the full
+packaging pipeline. `package:win` is the explicit CEF-backed Windows variant.
 
-Build-time tool behavior:
+Packaging stores downloaded build tools and intermediate payloads under `.tmp/`.
+Generated application artifacts are written under `release/`; both directories
+are intentionally ignored by Git.
 
-- packaging auto-downloads the required Node and Deno binaries locally when missing
-- those downloads are temporary local build-tool caches under `.tmp/build-tools/`
-- they are not meant to be committed to git
+## Desktop Behavior
 
-User config location:
+- Normal launch starts the local services and shows the frontend in the desktop
+  window.
+- `--runner` opens the configuration view without automatically starting the
+  service group.
+- The tray menu can focus the app, open configuration, start or stop services,
+  and quit.
+- Quitting the app stops the child runtime owned by that launcher instance.
+- If configured ports are occupied, the launcher chooses nearby free ports for
+  the current session.
 
-- preferred portable location: `<folder containing runner.app>/runner-data/config/`
-- fallback location when the app bundle folder is not writable: `~/Library/Application Support/runner/config/`
+See [docs/architecture.md](docs/architecture.md) for the runtime and packaging
+layout.
 
-Files created there:
+## Asset Maintenance
 
-- `defaults.json`
-- `user-overrides.json`
+The source app icon is `desktop/assets/app-icon.png`. Packaging regenerates the
+platform icon container for its target. Tray assets are checked in and can be
+regenerated with:
 
-Important Mac notes:
-
-- the packaging flow builds the `.app` bundle in `/tmp` and then copies it into `release/mac/` to avoid macOS extended-attribute issues when signing directly inside synced folders
-- the generated app is ad-hoc signed by the Deno packaging flow
-- for smoother distribution to other Mac users, proper Apple signing and notarization is still recommended
+```bash
+node scripts/build-tray-icons.js
+```
