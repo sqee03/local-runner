@@ -132,7 +132,8 @@ function openBrowser(url) {
     if (platform === "win32") {
       childProcess = spawn("cmd", ["/c", "start", "", url], {
         stdio: "ignore",
-        detached: true
+        detached: true,
+        windowsHide: true
       });
     } else if (platform === "darwin") {
       childProcess = spawn("open", [url], { stdio: "ignore", detached: true });
@@ -332,7 +333,8 @@ function spawnPackage(packageName, definition) {
   const childProcess = spawn(definition.executable, [definition.entry], {
     cwd: definition.cwd,
     stdio: shellMode === "desktop" ? "ignore" : "inherit",
-    env: definition.env
+    env: definition.env,
+    windowsHide: shellMode === "desktop"
   });
 
   runtimeState.packageProcesses[packageName] = childProcess;

@@ -296,8 +296,13 @@ function extractPayload(payloadRoot: string, payload: PayloadManifest) {
   fs.writeFileSync(markerPath, `${payload.hash}\n`, "utf8");
 }
 
-function resolveNodeRuntimePath(projectRoot: string) {
+function resolveNodeRuntimePath(projectRoot: string, shellMode: "desktop" | "browser") {
   if (Deno.build.os === "windows") {
+    const hiddenRuntimePath = path.join(projectRoot, "vendor", "windows-node-x64", "nodew.exe");
+    if (shellMode === "desktop" && fs.existsSync(hiddenRuntimePath)) {
+      return hiddenRuntimePath;
+    }
+
     return path.join(projectRoot, "vendor", "windows-node-x64", "node.exe");
   }
 
@@ -805,7 +810,7 @@ async function main() {
   writeDiagnosticLog(`Payload extracted to ${payloadRoot}.`);
 
   const projectRoot = payloadRoot;
-  const nodeExecutable = resolveNodeRuntimePath(projectRoot);
+  const nodeExecutable = resolveNodeRuntimePath(projectRoot, shellMode);
   const runnerEntry = path.join(projectRoot, "scripts", "mvp-orchestrator.js");
   const configPaths = ensurePersistentConfig(projectRoot, userDataDir);
   const effectiveConfig = loadEffectiveConfig(configPaths);

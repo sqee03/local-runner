@@ -21,6 +21,10 @@ const runtimeSources = {
     {
       source: ".tmp/build-tools/windows-node-x64/node.exe",
       target: "vendor/windows-node-x64/node.exe"
+    },
+    {
+      source: ".tmp/build-tools/windows-node-x64/nodew.exe",
+      target: "vendor/windows-node-x64/nodew.exe"
     }
   ],
   "mac-arm64": [
@@ -37,7 +41,10 @@ const targetSources = {
 };
 
 const requiredRuntimeFiles = {
-  windows: [".tmp/build-tools/windows-node-x64/node.exe"],
+  windows: [
+    ".tmp/build-tools/windows-node-x64/node.exe",
+    ".tmp/build-tools/windows-node-x64/nodew.exe"
+  ],
   "mac-arm64": [".tmp/build-tools/macos-arm64-node/bin/node"]
 };
 

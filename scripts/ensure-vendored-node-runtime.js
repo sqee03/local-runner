@@ -15,6 +15,7 @@ const runtimeConfigs = {
   windows: {
     destinationDir: path.join(projectRoot, ".tmp", "build-tools", "windows-node-x64"),
     requiredFile: path.join(projectRoot, ".tmp", "build-tools", "windows-node-x64", "node.exe"),
+    hiddenRuntimeFile: path.join(projectRoot, ".tmp", "build-tools", "windows-node-x64", "nodew.exe"),
     archiveFileName: `node-${nodeVersion}-win-x64.zip`,
     downloadUrl: `https://nodejs.org/dist/${nodeVersion}/node-${nodeVersion}-win-x64.zip`,
     extract(archivePath, destinationDir) {
@@ -22,6 +23,10 @@ const runtimeConfigs = {
     },
     finalize(destinationDir) {
       flattenSingleExtractedDirectory(destinationDir);
+      createWindowsGuiRuntime(
+        path.join(destinationDir, "node.exe"),
+        path.join(destinationDir, "nodew.exe")
+      );
     }
   },
   "mac-arm64": {
@@ -130,6 +135,27 @@ function flattenSingleExtractedDirectory(directoryPath) {
   fs.rmSync(extractedRoot, { recursive: true, force: true });
 }
 
+function createWindowsGuiRuntime(sourcePath, outputPath) {
+  if (!fs.existsSync(sourcePath)) {
+    throw new Error(`Missing Windows Node runtime at ${sourcePath}`);
+  }
+
+  const executable = fs.readFileSync(sourcePath);
+  const peOffset = executable.readUInt32LE(0x3c);
+  const peSignature = executable.toString("ascii", peOffset, peOffset + 4);
+
+  if (peSignature !== "PE\u0000\u0000") {
+    throw new Error(`Windows Node runtime is not a valid PE executable: ${sourcePath}`);
+  }
+
+  const optionalHeaderOffset = peOffset + 24;
+  const subsystemOffset = optionalHeaderOffset + 68;
+  const windowsGuiSubsystem = 2;
+
+  executable.writeUInt16LE(windowsGuiSubsystem, subsystemOffset);
+  fs.writeFileSync(outputPath, executable);
+}
+
 function downloadFile(url, outputPath) {
   return new Promise((resolve, reject) => {
     const fileStream = fs.createWriteStream(outputPath);
@@ -182,6 +208,10 @@ async function ensureRuntime(runtimeTarget) {
 
   if (fs.existsSync(config.requiredFile)) {
     console.log(`Using existing vendored Node runtime for ${runtimeTarget} at ${config.requiredFile}`);
+    if (config.hiddenRuntimeFile && !fs.existsSync(config.hiddenRuntimeFile)) {
+      createWindowsGuiRuntime(config.requiredFile, config.hiddenRuntimeFile);
+      console.log(`Created hidden Windows Node runtime at ${config.hiddenRuntimeFile}`);
+    }
     return;
   }
 
