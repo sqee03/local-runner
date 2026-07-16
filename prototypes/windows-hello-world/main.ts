@@ -31,14 +31,6 @@ const page = `<!doctype html>
   </body>
 </html>`;
 
-const window = new Deno.BrowserWindow({
-  title: "Hello World",
-  width: 800,
-  height: 600,
-});
-
-window.addEventListener("close", () => Deno.exit());
-
 Deno.serve(() =>
   new Response(page, {
     headers: { "content-type": "text/html; charset=utf-8" },
