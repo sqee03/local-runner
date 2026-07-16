@@ -1,0 +1,13 @@
+{
+  "tasks": {
+    "start": "deno desktop --backend webview main.ts",
+    "build:windows": "deno desktop --backend webview --compress=xz --target x86_64-pc-windows-msvc --output dist/HelloWorld main.ts"
+  },
+  "desktop": {
+    "app": {
+      "name": "HelloWorld",
+      "identifier": "com.prototype.hello-world"
+    },
+    "backend": "webview"
+  }
+}
