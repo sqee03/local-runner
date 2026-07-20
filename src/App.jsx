@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import appVersionInfo from "../version.json";
 import {
   configSections,
   getValueAtPath,
@@ -23,6 +24,7 @@ function resolvePage(pathname) {
 }
 
 function App() {
+  const appVersion = appVersionInfo.version;
   const frontendWindowRef = useRef(null);
   const [page, setPage] = useState(() => resolvePage(window.location.pathname));
   const [configData, setConfigData] = useState(null);
@@ -239,7 +241,10 @@ function App() {
     return (
       <section className={isDesktopShell ? "config-card desktop-surface" : "config-card"}>
         <p className="eyebrow">Runner Settings</p>
-        <h1>Config</h1>
+        <div className="title-row">
+          <h1>Config</h1>
+          <span className="version-badge">v{appVersion}</span>
+        </div>
         <p className="lede">
           Defaults ship in one JSON file, and your local machine-specific overrides
           are saved separately for the next desktop app launch or service restart.
@@ -407,7 +412,10 @@ function App() {
       {!isConfigPage ? (
         <section className="hero-card">
           <p className="eyebrow">Runner control tool</p>
-          <h1>Package Runner</h1>
+          <div className="title-row">
+            <h1>Package Runner</h1>
+            <span className="version-badge">v{appVersion}</span>
+          </div>
           <p className="lede">
             This runner controls separate FE, BE, and MQTT packages. The frontend
             package launches on its own port as an injected application.

@@ -29,6 +29,10 @@ function copyDirectory(relativePath) {
   });
 }
 
+function copyFile(relativePath) {
+  fs.copyFileSync(resolve(relativePath), resolveStaged(relativePath));
+}
+
 async function bundleNodeEntry(sourcePath, outputPath) {
   await build({
     entryPoints: [resolve(sourcePath)],
@@ -86,6 +90,7 @@ async function main() {
 
   copyDirectory("config");
   copyDirectory("dist");
+  copyFile("version.json");
   const packageMetadata = JSON.parse(fs.readFileSync(resolve("package.json"), "utf8"));
   fs.writeFileSync(
     resolveStaged("package.json"),

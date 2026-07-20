@@ -112,6 +112,10 @@ type RuntimeStatus = {
   isTransitioning?: boolean;
 };
 
+type AppVersionInfo = {
+  version: string;
+};
+
 const desktopDeno = Deno as DesktopDeno;
 const appName = "runner";
 const launchMode = Deno.args.includes("--runner") ? "runner" : "app";
@@ -566,17 +570,35 @@ function resolveDesktopUrl(runnerUrl: string, view: DesktopView) {
   return `${runnerUrl}${view === "config" ? "/desktop/config" : "/desktop/simulator"}`;
 }
 
-function resolveWindowTitle(view: DesktopView) {
-  return view === "config" ? `${appName} - Config` : `${appName} - Simulator`;
+function loadAppVersion(projectRoot: string) {
+  const versionPath = path.join(projectRoot, "version.json");
+
+  if (!fs.existsSync(versionPath)) {
+    throw new Error(`App version file is missing at ${versionPath}`);
+  }
+
+  const versionInfo = JSON.parse(fs.readFileSync(versionPath, "utf8")) as AppVersionInfo;
+  const version = versionInfo.version?.trim();
+
+  if (!version) {
+    throw new Error(`App version is missing in ${versionPath}`);
+  }
+
+  return version;
 }
 
-function createMainWindow() {
+function resolveWindowTitle(view: DesktopView, appVersion: string) {
+  const label = view === "config" ? "Config" : "Simulator";
+  return `${appName} v${appVersion} - ${label}`;
+}
+
+function createMainWindow(appVersion: string) {
   if (!desktopDeno.BrowserWindow) {
     return null;
   }
 
   activeDesktopWindow = new desktopDeno.BrowserWindow({
-    title: resolveWindowTitle(launchMode === "runner" ? "config" : "simulator"),
+    title: resolveWindowTitle(launchMode === "runner" ? "config" : "simulator", appVersion),
     width: desktopWindowDefaults.width,
     height: desktopWindowDefaults.height
   });
@@ -684,9 +706,10 @@ async function launchOrAttachRunner(
 async function setupDesktopShell(
   projectRoot: string,
   launchContext: LaunchContext,
-  shutdown: (code?: number) => Promise<void>
+  shutdown: (code?: number) => Promise<void>,
+  appVersion: string
 ) {
-  const win = createMainWindow();
+  const win = createMainWindow(appVersion);
   if (!win || !desktopDeno.Tray) {
     return;
   }
@@ -696,7 +719,7 @@ async function setupDesktopShell(
 
   const showView = (view: DesktopView) => {
     currentView = view;
-    win.setTitle(resolveWindowTitle(view));
+    win.setTitle(resolveWindowTitle(view, appVersion));
     win.navigate(resolveDesktopUrl(launchContext.runnerUrl, view));
     win.show();
     win.focus();
@@ -724,7 +747,7 @@ async function setupDesktopShell(
     tray.setIconDark(await Deno.readFile(iconPaths.dark));
   }
 
-  tray.setTooltip(appName);
+  tray.setTooltip(`${appName} v${appVersion}`);
 
   const updateTrayMenu = async () => {
     const runtimeStatus = await readRuntimeStatus(launchContext.runnerUrl);
@@ -732,6 +755,8 @@ async function setupDesktopShell(
     const servicesEnabled = !runtimeStatus.isTransitioning;
 
     tray.setMenu([
+      { item: { label: `Version v${appVersion}`, id: "version", enabled: false } },
+      "separator",
       { item: { label: "Open app", id: "simulator", enabled: true } },
       { item: { label: "Open config", id: "config", enabled: true } },
       "separator",
@@ -810,6 +835,7 @@ async function main() {
   writeDiagnosticLog(`Payload extracted to ${payloadRoot}.`);
 
   const projectRoot = payloadRoot;
+  const appVersion = loadAppVersion(projectRoot);
   const nodeExecutable = resolveNodeRuntimePath(projectRoot, shellMode);
   const runnerEntry = path.join(projectRoot, "scripts", "mvp-orchestrator.js");
   const configPaths = ensurePersistentConfig(projectRoot, userDataDir);
@@ -881,7 +907,7 @@ async function main() {
   }
 
   if (shellMode === "desktop") {
-    await setupDesktopShell(projectRoot, launchContext, shutdown);
+    await setupDesktopShell(projectRoot, launchContext, shutdown, appVersion);
     writeDiagnosticLog("Desktop shell initialized.");
 
     const forwardSignal = () => {
