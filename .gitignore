@@ -3,4 +3,5 @@ dist/
 release/
 .tmp/
 desktop/bin/
+logs/
 .DS_Store

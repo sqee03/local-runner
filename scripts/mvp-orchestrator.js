@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import net from "node:net";
 import { spawn } from "node:child_process";
+import { inspect } from "node:util";
 import { fileURLToPath } from "node:url";
 import { createConfigStore } from "./config-store.js";
 
@@ -10,6 +11,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
 const distDir = path.join(projectRoot, "dist");
+const logDir = process.env.PACKAGE_RUNNER_LOG_DIR
+  ? path.resolve(process.env.PACKAGE_RUNNER_LOG_DIR)
+  : path.join(projectRoot, "logs");
+const orchestratorLogPath = path.join(logDir, "orchestrator.log");
 const configStore = createConfigStore(projectRoot);
 const launchMode = process.env.PACKAGE_RUNNER_LAUNCH_MODE ?? "runner-ui";
 const shellMode = process.env.PACKAGE_RUNNER_SHELL_MODE ?? "browser";
@@ -22,6 +27,84 @@ const packagePortOverrides = {
   mqttTcp: Number.parseInt(process.env.PACKAGE_RUNNER_MQTT_TCP_PORT_OVERRIDE ?? "", 10),
   mqttWs: Number.parseInt(process.env.PACKAGE_RUNNER_MQTT_WS_PORT_OVERRIDE ?? "", 10)
 };
+
+fs.mkdirSync(logDir, { recursive: true });
+
+const nativeConsole = {
+  info: console.log.bind(console),
+  warn: console.warn.bind(console),
+  error: console.error.bind(console)
+};
+
+function formatLogValue(value) {
+  if (value instanceof Error) {
+    return value.stack ?? value.message;
+  }
+
+  return typeof value === "string" ? value : inspect(value, { depth: 5, breakLength: Infinity });
+}
+
+function appendLogLine(filePath, level, values) {
+  const message = values.map(formatLogValue).join(" ");
+
+  try {
+    fs.appendFileSync(
+      filePath,
+      `[${new Date().toISOString()}] [${level.toUpperCase()}] ${message}\n`,
+      "utf8"
+    );
+  } catch (error) {
+    nativeConsole.error(`Failed to write log file ${filePath}: ${error.message}`);
+  }
+}
+
+const logger = {
+  info(...values) {
+    appendLogLine(orchestratorLogPath, "info", values);
+    nativeConsole.info(...values);
+  },
+  warn(...values) {
+    appendLogLine(orchestratorLogPath, "warn", values);
+    nativeConsole.warn(...values);
+  },
+  error(...values) {
+    appendLogLine(orchestratorLogPath, "error", values);
+    nativeConsole.error(...values);
+  }
+};
+
+logger.info(`Orchestrator process started (pid=${process.pid}).`);
+
+function attachPackageOutput(packageName, childProcess) {
+  const logPath = path.join(logDir, `${packageName}.log`);
+
+  appendLogLine(logPath, "info", [`Process started (pid=${childProcess.pid}).`]);
+
+  const forwardStream = (stream, level, terminalStream) => {
+    let pending = "";
+
+    stream.setEncoding("utf8");
+    stream.on("data", (chunk) => {
+      if (shellMode !== "desktop") {
+        terminalStream.write(chunk);
+      }
+
+      const lines = `${pending}${chunk}`.split(/\r?\n/);
+      pending = lines.pop() ?? "";
+      for (const line of lines) {
+        appendLogLine(logPath, level, [line]);
+      }
+    });
+    stream.on("end", () => {
+      if (pending) {
+        appendLogLine(logPath, level, [pending]);
+      }
+    });
+  };
+
+  forwardStream(childProcess.stdout, "stdout", process.stdout);
+  forwardStream(childProcess.stderr, "stderr", process.stderr);
+}
 
 const runtimeState = {
   isRunning: false,
@@ -142,11 +225,11 @@ function openBrowser(url) {
     }
 
     childProcess.on("error", (error) => {
-      console.error(`Failed to open browser for ${url}: ${error.message}`);
+      logger.error(`Failed to open browser for ${url}: ${error.message}`);
     });
     childProcess.unref();
   } catch (error) {
-    console.error(`Failed to open browser for ${url}: ${error.message}`);
+    logger.error(`Failed to open browser for ${url}: ${error.message}`);
   }
 }
 
@@ -238,7 +321,7 @@ async function resolveRuntimePorts(configSnapshot) {
     const resolvedPort = await findAvailablePort(host, preferredPort);
 
     if (resolvedPort !== preferredPort) {
-      console.warn(`${label} port ${preferredPort} is busy. Falling back to ${resolvedPort}.`);
+      logger.warn(`${label} port ${preferredPort} is busy. Falling back to ${resolvedPort}.`);
       ports[key] = resolvedPort;
     }
   }
@@ -303,7 +386,10 @@ function buildPackageRuntimeConfig(configSnapshot) {
 }
 
 function attachPackageExitHandler(packageName, childProcess) {
-  childProcess.on("exit", (code) => {
+  childProcess.on("exit", (code, signal) => {
+    appendLogLine(path.join(logDir, `${packageName}.log`), "info", [
+      `Process exited (code=${code ?? "none"}, signal=${signal ?? "none"}).`
+    ]);
     runtimeState.packageProcesses[packageName] = null;
     runtimeState.packageStatus[packageName] = "stopped";
 
@@ -314,7 +400,7 @@ function attachPackageExitHandler(packageName, childProcess) {
     if (runtimeState.isRunning) {
       runtimeState.lastError = `${packageName.toUpperCase()} package exited unexpectedly with code ${code ?? "unknown"}.`;
       runtimeState.isRunning = false;
-      console.error(runtimeState.lastError);
+      logger.error(runtimeState.lastError);
     }
   });
 
@@ -324,7 +410,8 @@ function attachPackageExitHandler(packageName, childProcess) {
     runtimeState.lastError = `${packageName.toUpperCase()} package failed to start: ${error.message}`;
     runtimeState.isRunning = false;
     runtimeState.isTransitioning = false;
-    console.error(runtimeState.lastError);
+    appendLogLine(path.join(logDir, `${packageName}.log`), "error", [runtimeState.lastError]);
+    logger.error(runtimeState.lastError);
   });
 }
 
@@ -332,12 +419,13 @@ function spawnPackage(packageName, definition) {
   runtimeState.packageStatus[packageName] = "starting";
   const childProcess = spawn(definition.executable, [definition.entry], {
     cwd: definition.cwd,
-    stdio: shellMode === "desktop" ? "ignore" : "inherit",
+    stdio: ["ignore", "pipe", "pipe"],
     env: definition.env,
     windowsHide: shellMode === "desktop"
   });
 
   runtimeState.packageProcesses[packageName] = childProcess;
+  attachPackageOutput(packageName, childProcess);
   attachPackageExitHandler(packageName, childProcess);
   runtimeState.packageStatus[packageName] = "running";
   return childProcess;
@@ -400,6 +488,7 @@ async function startRuntime() {
     return normalizeRuntimeForClient();
   }
 
+  logger.info("Starting FE, BE, and MQTT packages.");
   runtimeState.isTransitioning = true;
   runtimeState.lastError = null;
 
@@ -416,8 +505,10 @@ async function startRuntime() {
       frontendAppUrl: `http://${packageConfig.host}:${packageConfig.ports.frontendPackage}`
     };
     runtimeState.isRunning = true;
+    logger.info("FE, BE, and MQTT packages are running.");
   } catch (error) {
     runtimeState.lastError = error.message;
+    logger.error(`Package startup failed: ${error.message}`);
     await Promise.all(["fe", "be", "mqtt"].map((name) => stopProcess(name).catch(() => {})));
     throw error;
   } finally {
@@ -434,6 +525,7 @@ async function stopRuntime() {
   }
 
   runtimeState.isTransitioning = true;
+  logger.info("Stopping FE, BE, and MQTT packages.");
   runtimeState.lastError = null;
   runtimeState.isRunning = false;
 
@@ -442,6 +534,7 @@ async function stopRuntime() {
   }
 
   runtimeState.isTransitioning = false;
+  logger.info("FE, BE, and MQTT packages stopped.");
   return normalizeRuntimeForClient();
 }
 
@@ -528,6 +621,7 @@ async function main() {
   });
 
   const shutdown = async () => {
+    logger.info("Orchestrator shutdown begin.");
     await stopRuntime().catch(() => {});
     await new Promise((resolve) => staticServer.close(resolve));
     process.exit(0);
@@ -537,12 +631,13 @@ async function main() {
   process.on("SIGTERM", shutdown);
 
   const runnerUrl = `http://${host}:${runnerPort}`;
-  console.log(`Runner ready at ${runnerUrl}`);
-  console.log(`Config defaults: ${configStore.defaultConfigPath}`);
-  console.log(`Config overrides: ${configStore.userConfigPath}`);
+  logger.info(`Runner ready at ${runnerUrl}`);
+  logger.info(`Config defaults: ${configStore.defaultConfigPath}`);
+  logger.info(`Config overrides: ${configStore.userConfigPath}`);
+  logger.info(`Logs: ${logDir}`);
 
   if (launchMode === "app") {
-    console.log("App launch mode enabled. Starting FE, BE, and MQTT packages.");
+    logger.info("App launch mode enabled. Starting FE, BE, and MQTT packages.");
 
     try {
       const runtimePayload = await startRuntime();
@@ -554,7 +649,7 @@ async function main() {
       }
     } catch (error) {
       runtimeState.lastError = error.message;
-      console.error(`Automatic app launch failed: ${error.message}`);
+      logger.error(`Automatic app launch failed: ${error.message}`);
       if (shellMode !== "desktop") {
         openBrowser(runnerUrl);
       }
@@ -569,6 +664,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error.message);
+  logger.error(error);
   process.exit(1);
 });

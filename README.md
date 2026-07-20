@@ -56,8 +56,11 @@ directory and keeps user overrides there:
 | Windows | `<runner.exe directory>/runner-data/config/` | `%LOCALAPPDATA%/runner/config/` |
 | macOS | `<runner.app>/Contents/MacOS/runner-data/config/` | `~/Library/Application Support/runner/config/` |
 
-The desktop launcher writes startup diagnostics to `desktop.log` in the same
-`runner-data` directory.
+Runtime output is appended to separate files under the `logs/` folder in the
+same `runner-data` directory: `launcher.log`, `orchestrator.log`, `fe.log`,
+`be.log`, and `mqtt.log`. The tray's **Open logs** action opens this folder.
+Local development writes the same set (except `launcher.log`) under the project
+`logs/` directory.
 
 ## Packaging
 

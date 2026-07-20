@@ -128,6 +128,7 @@ const desktopWindowDefaults = {
 };
 let activeDesktopWindow: DesktopBrowserWindow | null = null;
 let activeDesktopTray: DesktopTray | null = null;
+let logDirectoryPath: string | null = null;
 let diagnosticLogPath: string | null = null;
 
 function ensureDirectory(directoryPath: string) {
@@ -460,6 +461,38 @@ function resolvePortOverrides(config: EffectiveConfig): PortOverrides {
   };
 }
 
+function openPath(targetPath: string, reveal = false) {
+  try {
+    if (Deno.build.os === "windows") {
+      new Deno.Command("explorer", {
+        args: reveal ? ["/select,", targetPath] : [targetPath],
+        stdout: "null",
+        stderr: "null"
+      }).spawn();
+      return;
+    }
+
+    if (Deno.build.os === "darwin") {
+      new Deno.Command("open", {
+        args: reveal ? ["-R", targetPath] : [targetPath],
+        stdout: "null",
+        stderr: "null"
+      }).spawn();
+      return;
+    }
+
+    new Deno.Command("xdg-open", {
+      args: [reveal ? path.dirname(targetPath) : targetPath],
+      stdout: "null",
+      stderr: "null"
+    }).spawn();
+  } catch (error) {
+    const message = `Path open failed for ${targetPath}: ${error instanceof Error ? error.message : String(error)}`;
+    console.error(message);
+    writeDiagnosticLog(message);
+  }
+}
+
 function openBrowser(url: string) {
   try {
     if (Deno.build.os === "windows") {
@@ -672,9 +705,10 @@ async function launchOrAttachRunner(
   const launchUrls = resolveUrls(effectiveConfig, portOverrides.runner);
 
   if (portOverrides.runner !== configuredUrls.runnerPort) {
-    console.warn(
-      `Runner port ${configuredUrls.runnerPort} is busy. Falling back to ${portOverrides.runner}.`
-    );
+    const message =
+      `Runner port ${configuredUrls.runnerPort} is busy. Falling back to ${portOverrides.runner}.`;
+    console.warn(message);
+    writeDiagnosticLog(message);
   }
 
   const child = new Deno.Command(nodeExecutable, {
@@ -684,6 +718,7 @@ async function launchOrAttachRunner(
       ...Deno.env.toObject(),
       PACKAGE_RUNNER_BUNDLED_CONFIG_DIR: configPaths.bundledConfigDir,
       PACKAGE_RUNNER_USER_CONFIG_DIR: configPaths.userConfigDir,
+      PACKAGE_RUNNER_LOG_DIR: logDirectoryPath ?? path.join(projectRoot, "logs"),
       PACKAGE_RUNNER_LAUNCH_MODE: launchMode,
       PACKAGE_RUNNER_SHELL_MODE: shellMode,
       PACKAGE_RUNNER_PORT_OVERRIDE: String(portOverrides.runner),
@@ -760,6 +795,7 @@ async function setupDesktopShell(
       "separator",
       { item: { label: "Open app", id: "simulator", enabled: true } },
       { item: { label: "Open config", id: "config", enabled: true } },
+      { item: { label: "Open logs", id: "logs", enabled: Boolean(logDirectoryPath) } },
       "separator",
       { item: { label: servicesLabel, id: "toggle-services", enabled: servicesEnabled } },
       "separator",
@@ -789,6 +825,11 @@ async function setupDesktopShell(
       case "config":
         showView("config");
         break;
+      case "logs":
+        if (logDirectoryPath) {
+          openPath(logDirectoryPath);
+        }
+        break;
       case "toggle-services": {
         readRuntimeStatus(launchContext.runnerUrl)
           .then(async (runtimeStatus) => {
@@ -799,7 +840,9 @@ async function setupDesktopShell(
             await updateTrayMenu();
           })
           .catch((error) => {
-            console.error(`Tray service toggle failed: ${error.message}`);
+            const message = `Tray service toggle failed: ${error.message}`;
+            console.error(message);
+            writeDiagnosticLog(message);
           });
         break;
       }
@@ -827,8 +870,11 @@ async function setupDesktopShell(
 async function main() {
   const payload = loadPayloadManifest();
   const userDataDir = resolveUserDataDir();
-  diagnosticLogPath = path.join(userDataDir, "desktop.log");
+  logDirectoryPath = path.join(userDataDir, "logs");
+  ensureDirectory(logDirectoryPath);
+  diagnosticLogPath = path.join(logDirectoryPath, "launcher.log");
   writeDiagnosticLog("Desktop startup begin.");
+  writeDiagnosticLog(`Logs directory: ${logDirectoryPath}.`);
   const payloadRoot = path.join(userDataDir, "runtime", payload.hash);
   const shellMode: "desktop" | "browser" = supportsDesktopShell() ? "desktop" : "browser";
 
@@ -869,6 +915,7 @@ async function main() {
     }
 
     shuttingDown = true;
+    writeDiagnosticLog(`Desktop shutdown begin (code=${code}).`);
 
     if (launchContext.child) {
       terminateChildProcess(launchContext.child);
