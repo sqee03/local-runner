@@ -600,7 +600,8 @@ function createMainWindow(appVersion: string) {
   activeDesktopWindow = new desktopDeno.BrowserWindow({
     title: resolveWindowTitle(launchMode === "runner" ? "config" : "simulator", appVersion),
     width: desktopWindowDefaults.width,
-    height: desktopWindowDefaults.height
+    height: desktopWindowDefaults.height,
+    transparentTitlebar: true
   });
 
   return activeDesktopWindow;
