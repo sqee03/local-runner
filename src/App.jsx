@@ -23,6 +23,18 @@ function resolvePage(pathname) {
   return "home";
 }
 
+function resolveDocumentTitle(page, appVersion) {
+  if (page === "config" || page === "desktop-config") {
+    return `v${appVersion} - Config`;
+  }
+
+  if (page === "desktop-simulator") {
+    return `v${appVersion} - Simulator`;
+  }
+
+  return `v${appVersion}`;
+}
+
 function App() {
   const appVersion = appVersionInfo.version;
   const frontendWindowRef = useRef(null);
@@ -50,6 +62,10 @@ function App() {
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
+
+  useEffect(() => {
+    document.title = resolveDocumentTitle(page, appVersion);
+  }, [page, appVersion]);
 
   useEffect(() => {
     async function loadConfig() {

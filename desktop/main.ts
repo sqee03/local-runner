@@ -589,7 +589,7 @@ function loadAppVersion(projectRoot: string) {
 
 function resolveWindowTitle(view: DesktopView, appVersion: string) {
   const label = view === "config" ? "Config" : "Simulator";
-  return `${appName} v${appVersion} - ${label}`;
+  return `v${appVersion} - ${label}`;
 }
 
 function createMainWindow(appVersion: string) {
@@ -748,7 +748,7 @@ async function setupDesktopShell(
     tray.setIconDark(await Deno.readFile(iconPaths.dark));
   }
 
-  tray.setTooltip(`${appName} v${appVersion}`);
+  tray.setTooltip(`v${appVersion}`);
 
   const updateTrayMenu = async () => {
     const runtimeStatus = await readRuntimeStatus(launchContext.runnerUrl);
