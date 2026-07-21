@@ -67,7 +67,7 @@ Local development writes the same set (except `launcher.log`) under the project
 Build the Windows x64 app directory:
 
 ```bash
-npm run package:windows
+npm run package:windows:bundle
 ```
 
 The launchable artifact is `release/windows/runner/runner.exe`. The package
@@ -75,26 +75,51 @@ includes the Node runtime, built UI, and minified service bundles. It does not
 include the editable service sources or a loose `node_modules` tree, and does
 not require Node or npm on the target machine.
 
+Build the Deno-native Windows installer instead:
+
+```bash
+npm run package:windows:installer
+```
+
+The installer artifact is `release/windows/runner.msi`. Deno also leaves its
+source bundle at `release/windows/runner/`, so both forms are available after
+this command. The MSI installs the app per-machine under `%ProgramFiles%` and
+registers an uninstaller. The existing `npm run package:windows` command remains
+an alias for the bundle-only flow.
+
 Build the Apple Silicon macOS app:
 
 ```bash
-npm run package:mac:arm
+npm run package:mac:arm:bundle
 ```
 
 The artifact is `release/mac/runner.app`. The build is ad-hoc signed by the Deno
 packaging flow; external distribution still requires an Apple Developer signing
 identity and notarization.
 
-The equivalent full packaging tasks can be run with Deno:
+Build the Deno-native drag-to-Applications disk image instead:
 
 ```bash
-deno task package:windows
-deno task package:mac:arm
+npm run package:mac:arm:installer
 ```
 
-The `compile:windows` and `compile:mac:arm` Deno tasks are internal compile-only
-steps. They expect the payload manifest and runtime caches prepared by the full
-packaging pipeline. `package:win` is the explicit CEF-backed Windows variant.
+The installer artifact is `release/mac/runner.dmg`. Deno also leaves its source
+bundle at `release/mac/runner.app`, so both forms are available after this
+command. The installer command must run on macOS because Deno uses the system
+`hdiutil` tool. The existing `npm run package:mac:arm` command remains an alias
+for the bundle-only flow.
+
+The equivalent bundle and installer tasks can be run with Deno:
+
+```bash
+deno task package:windows:bundle
+deno task package:windows:installer
+deno task package:mac:arm:bundle
+deno task package:mac:arm:installer
+```
+
+The `compile:*` Deno tasks are internal compile-only steps. They expect the
+payload manifest and runtime caches prepared by the full packaging pipeline.
 
 Packaging stores downloaded build tools and intermediate payloads under `.tmp/`.
 Generated application artifacts are written under `release/`; both directories

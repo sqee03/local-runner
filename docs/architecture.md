@@ -52,9 +52,12 @@ The npm and full Deno packaging tasks run the same stages:
    `.tmp/packaged-runtime/`.
 6. Create the payload manifest containing generated bundles, static assets,
    configuration, and the target Node binary.
-7. Run the target-specific `deno desktop` compile task.
-8. Normalize the output into `release/windows/runner/` or
-   `release/mac/runner.app` and remove transient payload staging.
+7. Run the target-specific `deno desktop` compile task for either a release
+   bundle or native installer.
+8. Normalize bundle output into `release/windows/runner/` or
+   `release/mac/runner.app`. Installer builds keep that bundle and additionally
+   emit `release/windows/runner.msi` or `release/mac/runner.dmg`, then remove
+   transient payload staging.
 
 The Windows desktop launcher uses the GUI-subsystem `nodew.exe` for its child
 orchestrator so no console window appears. The regular `node.exe` remains in the
