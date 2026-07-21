@@ -29,6 +29,7 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^5.0.0",
     "esbuild": "^0.28.1",
+    "pe-library": "^2.0.1",
     "resedit": "^3.0.2",
     "vite": "^7.0.0"
   }
