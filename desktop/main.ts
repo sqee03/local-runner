@@ -625,6 +625,113 @@ function resolveWindowTitle(view: DesktopView, appVersion: string) {
   return `v${appVersion} - ${label}`;
 }
 
+function encodeWindowsWideString(value: string) {
+  const encoded = new Uint16Array(value.length + 1);
+
+  for (let index = 0; index < value.length; index += 1) {
+    encoded[index] = value.charCodeAt(index);
+  }
+
+  return encoded;
+}
+
+async function applyWindowsWindowIcon(
+  win: DesktopBrowserWindow,
+  projectRoot: string,
+  view: DesktopView,
+  appVersion: string
+) {
+  if (Deno.build.os !== "windows") {
+    return;
+  }
+
+  const iconPath = path.join(projectRoot, "desktop", "assets", "app-icon.ico");
+  if (!fs.existsSync(iconPath)) {
+    writeDiagnosticLog(`Window icon is missing at ${iconPath}.`);
+    return;
+  }
+
+  const finalTitle = resolveWindowTitle(view, appVersion);
+  const lookupTitle = `${finalTitle} [${Deno.pid}]`;
+  win.setTitle(lookupTitle);
+
+  const user32 = Deno.dlopen("user32.dll", {
+    FindWindowW: {
+      parameters: ["pointer", "pointer"],
+      result: "pointer"
+    },
+    GetSystemMetrics: {
+      parameters: ["i32"],
+      result: "i32"
+    },
+    LoadImageW: {
+      parameters: ["pointer", "pointer", "u32", "i32", "i32", "u32"],
+      result: "pointer"
+    },
+    SendMessageW: {
+      parameters: ["pointer", "u32", "usize", "pointer"],
+      result: "isize"
+    }
+  } as const);
+
+  try {
+    const titleBytes = encodeWindowsWideString(lookupTitle);
+    const titlePointer = Deno.UnsafePointer.of(titleBytes);
+    let windowHandle: Deno.PointerValue = null;
+
+    for (let attempt = 0; attempt < 20 && !windowHandle; attempt += 1) {
+      windowHandle = user32.symbols.FindWindowW(null, titlePointer);
+      if (!windowHandle) {
+        await new Promise((resolve) => globalThis.setTimeout(resolve, 25));
+      }
+    }
+
+    if (!windowHandle) {
+      throw new Error("Could not resolve the native CEF window handle.");
+    }
+
+    const iconPathBytes = encodeWindowsWideString(iconPath);
+    const iconPathPointer = Deno.UnsafePointer.of(iconPathBytes);
+    const imageIcon = 1;
+    const loadFromFile = 0x0010;
+    const smallWidth = user32.symbols.GetSystemMetrics(49) || 16;
+    const smallHeight = user32.symbols.GetSystemMetrics(50) || 16;
+    const largeWidth = user32.symbols.GetSystemMetrics(11) || 32;
+    const largeHeight = user32.symbols.GetSystemMetrics(12) || 32;
+    const smallIcon = user32.symbols.LoadImageW(
+      null,
+      iconPathPointer,
+      imageIcon,
+      smallWidth,
+      smallHeight,
+      loadFromFile
+    );
+    const largeIcon = user32.symbols.LoadImageW(
+      null,
+      iconPathPointer,
+      imageIcon,
+      largeWidth,
+      largeHeight,
+      loadFromFile
+    );
+
+    if (!smallIcon || !largeIcon) {
+      throw new Error("Windows could not load the application ICO.");
+    }
+
+    const setIconMessage = 0x0080;
+    user32.symbols.SendMessageW(windowHandle, setIconMessage, 0n, smallIcon);
+    user32.symbols.SendMessageW(windowHandle, setIconMessage, 1n, largeIcon);
+    writeDiagnosticLog("Applied the application icon to the native Windows window.");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    writeDiagnosticLog(`Failed to apply the native Windows window icon: ${message}`);
+  } finally {
+    win.setTitle(finalTitle);
+    user32.close();
+  }
+}
+
 function createMainWindow(appVersion: string) {
   if (!desktopDeno.BrowserWindow) {
     return null;
@@ -752,6 +859,8 @@ async function setupDesktopShell(
 
   let allowClose = false;
   let currentView: DesktopView = launchMode === "runner" ? "config" : "simulator";
+
+  await applyWindowsWindowIcon(win, projectRoot, currentView, appVersion);
 
   const showView = (view: DesktopView) => {
     currentView = view;

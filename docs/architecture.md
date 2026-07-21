@@ -72,6 +72,11 @@ shared multi-resolution icon after bundle creation. Installer builds stage that
 finalized launcher as Deno's local Windows backend before MSI assembly so the
 installed executable carries the same icon resources.
 
+Deno Desktop 2.9 does not expose a `BrowserWindow` icon option. On Windows the
+desktop shell therefore loads the same ICO through `user32.dll` and sends both
+the small title-bar and large taskbar icon to the native CEF window. This native
+step is Windows-only and requires the FFI permission included in Windows builds.
+
 ## Repository Boundaries
 
 - `desktop/` contains the Deno shell and checked-in image assets.
