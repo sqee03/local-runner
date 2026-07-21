@@ -71,6 +71,7 @@ type DesktopMenuEntry =
 
 type DesktopBrowserWindow = EventTarget & {
   close(): void;
+  executeJs(script: string): Promise<unknown>;
   focus(): void;
   hide(): void;
   isClosed(): boolean;
@@ -625,6 +626,45 @@ function resolveWindowTitle(view: DesktopView, appVersion: string) {
   return `v${appVersion} - ${label}`;
 }
 
+async function centerWindowOnCurrentScreen(win: DesktopBrowserWindow) {
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    try {
+      const bounds = await win.executeJs(`(() => ({
+        x: Number.isFinite(globalThis.screen?.availLeft) ? globalThis.screen.availLeft : 0,
+        y: Number.isFinite(globalThis.screen?.availTop) ? globalThis.screen.availTop : 0,
+        width: globalThis.screen?.availWidth,
+        height: globalThis.screen?.availHeight
+      }))()`);
+
+      if (!bounds || typeof bounds !== "object") {
+        throw new Error("Screen bounds are unavailable.");
+      }
+
+      const screenBounds = bounds as Record<string, unknown>;
+      const screenX = Number(screenBounds.x);
+      const screenY = Number(screenBounds.y);
+      const screenWidth = Number(screenBounds.width);
+      const screenHeight = Number(screenBounds.height);
+
+      if (![screenX, screenY, screenWidth, screenHeight].every(Number.isFinite) ||
+        screenWidth <= 0 || screenHeight <= 0) {
+        throw new Error("Screen bounds are invalid.");
+      }
+
+      const [windowWidth, windowHeight] = win.getSize();
+      const x = Math.round(screenX + Math.max(0, (screenWidth - windowWidth) / 2));
+      const y = Math.round(screenY + Math.max(0, (screenHeight - windowHeight) / 2));
+      win.setPosition(x, y);
+      writeDiagnosticLog(`Centered desktop window at ${x},${y}.`);
+      return;
+    } catch {
+      await new Promise((resolve) => globalThis.setTimeout(resolve, 50));
+    }
+  }
+
+  writeDiagnosticLog("Could not center the desktop window because screen bounds were unavailable.");
+}
+
 function encodeWindowsWideString(value: string) {
   const encoded = new Uint16Array(value.length + 1);
 
@@ -974,6 +1014,7 @@ async function setupDesktopShell(
 
   await waitForUrl(`${launchContext.runnerUrl}/api/runtime`, 20000);
   showView(currentView);
+  await centerWindowOnCurrentScreen(win);
 }
 
 async function main() {
