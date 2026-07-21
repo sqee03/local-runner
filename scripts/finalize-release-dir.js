@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
+const removeWindowsBundle = process.argv.includes("--remove-windows-bundle");
 
 fs.rmSync(path.join(projectRoot, ".tmp", "payload-manifest.json"), {
   recursive: true,
@@ -25,3 +26,12 @@ fs.rmSync(path.join(projectRoot, ".tmp", "windows-icon-backend"), {
   recursive: true,
   force: true
 });
+
+if (removeWindowsBundle) {
+  fs.rmSync(path.join(projectRoot, "release", "windows", "runner"), {
+    recursive: true,
+    force: true,
+    maxRetries: 5,
+    retryDelay: 100
+  });
+}

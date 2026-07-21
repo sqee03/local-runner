@@ -11,7 +11,7 @@
     "package:windows": "npm run package:windows:bundle",
     "package:windows:prepare": "npm run build && node scripts/build-windows-icon.js && node scripts/prepare-release-dir.js windows && node scripts/ensure-vendored-node-runtime.js windows && node scripts/ensure-vendored-deno-runtime.js windows && node scripts/prepare-packaged-runtime.js && node scripts/create-deno-payload.js windows",
     "package:windows:bundle": "npm run package:windows:prepare && node scripts/run-deno-task.js compile:windows:bundle windows && node scripts/finalize-windows-desktop-app.js && node scripts/finalize-release-dir.js",
-    "package:windows:installer": "npm run package:windows:prepare && node scripts/run-deno-task.js compile:windows:bundle windows && node scripts/finalize-windows-desktop-app.js && node scripts/stage-windows-desktop-backend.js && node scripts/run-deno-task.js compile:windows:installer windows && node scripts/finalize-release-dir.js",
+    "package:windows:installer": "npm run package:windows:prepare && node scripts/run-deno-task.js compile:windows:bundle windows && node scripts/finalize-windows-desktop-app.js && node scripts/stage-windows-desktop-backend.js && node scripts/run-deno-task.js compile:windows:installer windows && node scripts/finalize-release-dir.js --remove-windows-bundle",
     "package:windows:gui": "npm run package:windows:bundle",
     "package:mac:arm": "npm run package:mac:arm:bundle",
     "package:mac:arm:prepare": "npm run build && node scripts/build-macos-icon.js && node scripts/prepare-release-dir.js mac-arm64 && node scripts/ensure-vendored-node-runtime.js mac-arm64 && node scripts/ensure-vendored-deno-runtime.js mac-arm64 && node scripts/prepare-packaged-runtime.js && node scripts/create-deno-payload.js mac-arm64",

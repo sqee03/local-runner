@@ -81,9 +81,9 @@ Build the Deno-native Windows installer instead:
 npm run package:windows:installer
 ```
 
-The installer artifact is `release/windows/runner.msi`. Deno also leaves its
-source bundle at `release/windows/runner/`, so both forms are available after
-this command. The MSI installs the app per-machine under `%ProgramFiles%` and
+The installer command leaves a single artifact at `release/windows/runner.msi`;
+its intermediate `release/windows/runner/` bundle is removed after the MSI is
+created. The MSI installs the app per-machine under `%ProgramFiles%` and
 registers an uninstaller. The existing `npm run package:windows` command remains
 an alias for the bundle-only flow.
 

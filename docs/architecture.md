@@ -55,9 +55,10 @@ The npm and full Deno packaging tasks run the same stages:
 7. Run the target-specific `deno desktop` compile task for either a release
    bundle or native installer.
 8. Normalize bundle output into `release/windows/runner/` or
-   `release/mac/runner.app`. Installer builds keep that bundle and additionally
-   emit `release/windows/runner.msi` or `release/mac/runner.dmg`, then remove
-   transient payload staging.
+   `release/mac/runner.app`. Installer builds additionally emit
+   `release/windows/runner.msi` or `release/mac/runner.dmg`, then remove
+   transient payload staging. The Windows installer flow also removes its
+   intermediate `runner/` bundle so `runner.msi` is its only release artifact.
 
 The Windows desktop launcher uses the GUI-subsystem `nodew.exe` for its child
 orchestrator so no console window appears. The regular `node.exe` remains in the
