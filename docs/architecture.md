@@ -65,6 +65,12 @@ payload for browser/debug execution. The macOS build is assembled in `/tmp`
 before being copied to `release/mac/` to avoid extended-attribute issues in the
 workspace.
 
+Deno 2.9 copies the configured Windows ICO beside the launcher rather than
+embedding it. The packaging pipeline therefore finalizes `runner.exe` with the
+shared multi-resolution icon after bundle creation. Installer builds stage that
+finalized launcher as Deno's local Windows backend before MSI assembly so the
+installed executable carries the same icon resources.
+
 ## Repository Boundaries
 
 - `desktop/` contains the Deno shell and checked-in image assets.

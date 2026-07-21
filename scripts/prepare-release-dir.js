@@ -45,6 +45,7 @@ removePath(releaseTargets[target]);
 removePath(path.join(tempRoot, "packaged-runtime"));
 removePath(path.join(tempRoot, "runtime-node_modules"));
 removePath(path.join(tempRoot, "payload-manifest.json"));
+removePath(path.join(tempRoot, "windows-icon-backend"));
 
 fs.mkdirSync(releaseRoot, { recursive: true });
 fs.mkdirSync(releaseTargets[target], { recursive: true });

@@ -10,6 +10,7 @@ const projectRoot = path.resolve(__dirname, "..");
 
 const taskName = process.argv[2];
 const target = process.argv[3];
+const stagedWindowsBackend = path.join(projectRoot, ".tmp", "windows-icon-backend");
 
 const denoBinaries = {
   windows: path.join(projectRoot, ".tmp", "build-tools", "windows-deno-x64", "deno.exe"),
@@ -54,6 +55,16 @@ const env = {
   PATH: composedPath,
   Path: composedPath
 };
+
+if (taskName === "compile:windows:installer") {
+  if (!fs.existsSync(stagedWindowsBackend)) {
+    throw new Error(
+      `Missing staged Windows backend at ${stagedWindowsBackend}. Finalize the Windows bundle before compiling the installer.`
+    );
+  }
+
+  env.LAUFEY_DEV_DIR = stagedWindowsBackend;
+}
 
 const result = spawnSync(denoCommand, ["task", taskName], {
   cwd: projectRoot,

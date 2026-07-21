@@ -148,9 +148,11 @@ layout.
 
 ## Asset Maintenance
 
-The source app icon is `desktop/assets/app-icon.png`. Packaging regenerates the
-platform icon container for its target. Tray assets are checked in and can be
-regenerated with:
+The shared tray/app symbol geometry lives in `scripts/icon-renderer.js`.
+Windows packaging generates a matching 512px app PNG and a multi-resolution
+ICO, then embeds all ICO sizes directly into `runner.exe`. macOS packaging uses
+the generated app PNG to build its ICNS container. Tray assets are checked in
+and can be regenerated with:
 
 ```bash
 node scripts/build-tray-icons.js

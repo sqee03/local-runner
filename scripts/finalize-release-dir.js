@@ -20,3 +20,8 @@ fs.rmSync(path.join(projectRoot, ".tmp", "runtime-node_modules"), {
   recursive: true,
   force: true
 });
+
+fs.rmSync(path.join(projectRoot, ".tmp", "windows-icon-backend"), {
+  recursive: true,
+  force: true
+});

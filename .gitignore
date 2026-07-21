@@ -4,4 +4,5 @@ release/
 .tmp/
 desktop/bin/
 logs/
+vendor/
 .DS_Store
