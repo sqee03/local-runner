@@ -839,7 +839,9 @@ async function launchOrAttachRunner(
   const existingRunnerIsReachable = await canReachUrl(`${configuredUrls.runnerUrl}/api/runtime`);
 
   if (existingRunnerIsReachable) {
-    await ensureRuntimeStarted(configuredUrls.runnerUrl).catch(() => {});
+    await ensureRuntimeStarted(configuredUrls.runnerUrl).catch(() => {
+      // Intentionally empty fallback
+    });
     return {
       runnerUrl: configuredUrls.runnerUrl,
       frontendAppUrl: configuredUrls.frontendAppUrl,
@@ -1115,7 +1117,9 @@ async function main() {
     };
 
     addExitSignalListeners(forwardSignal);
-    await new Promise<void>(() => {});
+    await new Promise<void>(() => {
+      // Intentionally empty fallback
+    });
   }
 
   const runtimeReady = await waitForUrl(`${launchContext.runnerUrl}/api/runtime`, 20000);
@@ -1126,7 +1130,9 @@ async function main() {
   if (launchMode === "config") {
     openBrowser(launchContext.runnerUrl);
   } else {
-    await ensureRuntimeStarted(launchContext.runnerUrl).catch(() => {});
+    await ensureRuntimeStarted(launchContext.runnerUrl).catch(() => {
+      // Intentionally empty fallback
+    });
     await waitForUrl(launchContext.frontendAppUrl, 20000).catch(() => false);
     openBrowser(launchContext.frontendAppUrl);
   }

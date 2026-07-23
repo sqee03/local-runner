@@ -1,7 +1,6 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
-import net from "node:net";
 import { type ChildProcess, spawn } from "node:child_process";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Readable, Writable } from "node:stream";
@@ -65,12 +64,6 @@ const nativeConsole = {
 };
 
 type LogLevel = "error" | "info" | "stderr" | "stdout" | "warn";
-type RuntimePorts = {
-  runner: number;
-  frontendPackage: number;
-  mqttTcp: number;
-  mqttWs: number;
-};
 
 interface Logger {
   info(...values: ReadonlyArray<unknown>): void;
@@ -271,80 +264,6 @@ function waitForHttpReady(url: string, timeoutMs = 15000): Promise<void> {
   });
 }
 
-function canBindPort(host: string, port: number): Promise<boolean> {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-
-    server.once("error", (error) => {
-      if ((error as NodeJS.ErrnoException).code === "EADDRINUSE") {
-        resolve(false);
-        return;
-      }
-
-      reject(error);
-    });
-
-    server.listen(port, host, () => {
-      server.close(() => resolve(true));
-    });
-  });
-}
-
-async function findAvailablePort(host: string, preferredPort: number): Promise<number> {
-  if (await canBindPort(host, preferredPort)) {
-    return preferredPort;
-  }
-
-  for (let candidate = preferredPort + 1; candidate < preferredPort + 25; candidate += 1) {
-    if (await canBindPort(host, candidate)) {
-      return candidate;
-    }
-  }
-
-  throw new Error(
-    `Port ${preferredPort} is unavailable and no fallback port was found nearby.`
-  );
-}
-
-async function resolveRuntimePorts(
-  configSnapshot: ConfigSnapshot
-): Promise<ConfigSnapshot["effective"]["ports"]> {
-  const host = configSnapshot.effective.interfaces.host;
-  const configuredPorts = configSnapshot.effective.ports;
-
-  const ports: RuntimePorts = {
-    ...configuredPorts,
-    runner: Number.isFinite(runnerPortOverride) ? runnerPortOverride : configuredPorts.runner,
-    frontendPackage: Number.isFinite(packagePortOverrides.frontendPackage)
-      ? packagePortOverrides.frontendPackage
-      : configuredPorts.frontendPackage,
-    mqttTcp: Number.isFinite(packagePortOverrides.mqttTcp)
-      ? packagePortOverrides.mqttTcp
-      : configuredPorts.mqttTcp,
-    mqttWs: Number.isFinite(packagePortOverrides.mqttWs)
-      ? packagePortOverrides.mqttWs
-      : configuredPorts.mqttWs
-  };
-
-  const portMappings: ReadonlyArray<readonly [keyof typeof ports, string]> = [
-    ["frontendPackage", "frontend package"],
-    ["mqttTcp", "MQTT TCP"],
-    ["mqttWs", "MQTT WebSocket"]
-  ];
-
-  for (const [key, label] of portMappings) {
-    const preferredPort = ports[key];
-    const resolvedPort = await findAvailablePort(host, preferredPort);
-
-    if (resolvedPort !== preferredPort) {
-      logger.warn(`${label} port ${preferredPort} is busy. Falling back to ${resolvedPort}.`);
-      ports[key] = resolvedPort;
-    }
-  }
-
-  return ports;
-}
-
 function buildPackageRuntimeConfig(configSnapshot: ConfigSnapshot) {
   return buildPackageRuntimeConfigWithOptions(configSnapshot, {
     projectRoot,
@@ -479,7 +398,9 @@ async function startRuntime(): Promise<ClientRuntimeState> {
   } catch (error) {
     runtimeState.lastError = errorMessage(error);
     logger.error(`Package startup failed: ${errorMessage(error)}`);
-    await Promise.all((["fe", "be", "mqtt"] as const).map((name) => stopProcess(name).catch(() => {})));
+    await Promise.all((["fe", "be", "mqtt"] as const).map((name) => stopProcess(name).catch(() => {
+      // Intentionally empty fallback
+    })));
     throw error;
   } finally {
     runtimeState.isTransitioning = false;
@@ -500,7 +421,9 @@ async function stopRuntime(): Promise<ClientRuntimeState> {
   runtimeState.isRunning = false;
 
   for (const packageName of ["fe", "be", "mqtt"] as const) {
-    await stopProcess(packageName).catch(() => {});
+    await stopProcess(packageName).catch(() => {
+      // Intentionally empty fallback
+    });
   }
 
   runtimeState.isTransitioning = false;
@@ -596,7 +519,9 @@ async function main(): Promise<void> {
 
   const shutdown = async () => {
     logger.info("Orchestrator shutdown begin.");
-    await stopRuntime().catch(() => {});
+    await stopRuntime().catch(() => {
+      // Intentionally empty fallback
+    });
     await new Promise<void>((resolve) => staticServer.close(() => resolve()));
     process.exit(0);
   };
@@ -618,7 +543,9 @@ async function main(): Promise<void> {
       const frontendAppUrl = runtimePayload.currentConfig?.frontendAppUrl;
 
       if (frontendAppUrl && shellMode !== "desktop") {
-        await waitForHttpReady(frontendAppUrl).catch(() => {});
+        await waitForHttpReady(frontendAppUrl).catch(() => {
+          // Intentionally empty fallback
+        });
         openBrowser(frontendAppUrl);
       }
     } catch (error) {
