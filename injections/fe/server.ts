@@ -11,7 +11,7 @@ const port = Number(process.env.FE_PORT ?? "4300");
 const mqttWsPort = Number(process.env.MQTT_WS_PORT ?? "19001");
 const testTopic = process.env.MQTT_TEST_TOPIC ?? "mvp/test";
 
-function contentTypeFor(filePath) {
+function contentTypeFor(filePath: string): string {
   if (filePath.endsWith(".html")) return "text/html; charset=utf-8";
   if (filePath.endsWith(".js")) return "text/javascript; charset=utf-8";
   if (filePath.endsWith(".css")) return "text/css; charset=utf-8";

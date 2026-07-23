@@ -4,6 +4,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { resolveProjectRoot } from "./runtime-paths.js";
+import { errorMessage } from "./node-types.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,7 +14,11 @@ const destinationAppPath = path.join(projectRoot, "release", "mac", "runner.app"
 const destinationDmgPath = path.join(projectRoot, "release", "mac", "runner.dmg");
 const createDmg = process.argv.includes("--dmg");
 
-function runCommand(commandName, args, failureMessage) {
+function runCommand(
+  commandName: string,
+  args: ReadonlyArray<string>,
+  failureMessage: string
+): void {
   const result = spawnSync(commandName, args, {
     stdio: "inherit"
   });
@@ -23,11 +28,11 @@ function runCommand(commandName, args, failureMessage) {
   }
 }
 
-function stripExtendedAttributes(targetPath) {
+function stripExtendedAttributes(targetPath: string): void {
   runCommand("xattr", ["-cr", targetPath], `Failed to strip extended attributes from ${targetPath}`);
 }
 
-function signApp(targetPath) {
+function signApp(targetPath: string): void {
   runCommand(
     "codesign",
     ["--force", "--deep", "--sign", "-", targetPath],
@@ -35,7 +40,7 @@ function signApp(targetPath) {
   );
 }
 
-function createDiskImage(appPath) {
+function createDiskImage(appPath: string): void {
   const stagingDir = fs.mkdtempSync(path.join(os.tmpdir(), "runner-dmg-"));
 
   try {
@@ -61,7 +66,7 @@ function createDiskImage(appPath) {
   }
 }
 
-function main() {
+function main(): void {
   if (!fs.existsSync(sourceAppPath)) {
     throw new Error(`Missing packaged Mac app at ${sourceAppPath}`);
   }
@@ -85,6 +90,6 @@ function main() {
 try {
   main();
 } catch (error) {
-  console.error(error.message);
+  console.error(errorMessage(error));
   process.exit(1);
 }

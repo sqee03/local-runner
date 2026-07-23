@@ -4,6 +4,11 @@ import https from "node:https";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { resolveProjectRoot } from "./runtime-paths.js";
+import {
+  type ReleaseTarget,
+  errorMessage,
+  isReleaseTarget
+} from "./node-types.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,17 +17,27 @@ const projectRoot = resolveProjectRoot(__dirname);
 const nodeVersion = "v26.1.0";
 const target = process.argv[2];
 
-const runtimeConfigs = {
+interface RuntimeConfig {
+  readonly destinationDir: string;
+  readonly requiredFile: string;
+  readonly hiddenRuntimeFile?: string;
+  readonly archiveFileName: string;
+  readonly downloadUrl: string;
+  extract(archivePath: string, destinationDir: string): void;
+  finalize(destinationDir: string): void;
+}
+
+const runtimeConfigs: Record<ReleaseTarget, RuntimeConfig> = {
   windows: {
     destinationDir: path.join(projectRoot, ".tmp", "build-tools", "windows-node-x64"),
     requiredFile: path.join(projectRoot, ".tmp", "build-tools", "windows-node-x64", "node.exe"),
     hiddenRuntimeFile: path.join(projectRoot, ".tmp", "build-tools", "windows-node-x64", "nodew.exe"),
     archiveFileName: `node-${nodeVersion}-win-x64.zip`,
     downloadUrl: `https://nodejs.org/dist/${nodeVersion}/node-${nodeVersion}-win-x64.zip`,
-    extract(archivePath, destinationDir) {
+    extract(archivePath: string, destinationDir: string): void {
       extractZipArchive(archivePath, destinationDir, "Windows Node runtime archive");
     },
-    finalize(destinationDir) {
+    finalize(destinationDir: string): void {
       flattenSingleExtractedDirectory(destinationDir);
       createWindowsGuiRuntime(
         path.join(destinationDir, "node.exe"),
@@ -35,7 +50,7 @@ const runtimeConfigs = {
     requiredFile: path.join(projectRoot, ".tmp", "build-tools", "macos-arm64-node", "bin", "node"),
     archiveFileName: `node-${nodeVersion}-darwin-arm64.tar.gz`,
     downloadUrl: `https://nodejs.org/dist/${nodeVersion}/node-${nodeVersion}-darwin-arm64.tar.gz`,
-    extract(archivePath, destinationDir) {
+    extract(archivePath: string, destinationDir: string): void {
       ensureCommand("tar");
       const result = spawnSync("tar", ["-xzf", archivePath, "-C", destinationDir], {
         stdio: "inherit"
@@ -45,13 +60,13 @@ const runtimeConfigs = {
         throw new Error("Failed to extract macOS Node runtime archive.");
       }
     },
-    finalize(destinationDir) {
+    finalize(destinationDir: string): void {
       flattenSingleExtractedDirectory(destinationDir);
     }
   }
 };
 
-function ensureCommand(commandName) {
+function ensureCommand(commandName: string): void {
   const result = spawnSync(commandName, ["--version"], {
     stdio: "ignore"
   });
@@ -61,7 +76,7 @@ function ensureCommand(commandName) {
   }
 }
 
-function getAvailableCommand(commandNames) {
+function getAvailableCommand(commandNames: ReadonlyArray<string>): string | null {
   for (const commandName of commandNames) {
     const result = spawnSync(commandName, ["-Command", "$PSVersionTable.PSVersion.ToString()"], {
       stdio: "ignore"
@@ -75,7 +90,7 @@ function getAvailableCommand(commandNames) {
   return null;
 }
 
-function extractZipArchive(archivePath, destinationDir, label) {
+function extractZipArchive(archivePath: string, destinationDir: string, label: string): void {
   if (process.platform === "win32") {
     const powerShellCommand = getAvailableCommand(["powershell.exe", "powershell", "pwsh.exe", "pwsh"]);
 
@@ -110,12 +125,12 @@ function extractZipArchive(archivePath, destinationDir, label) {
   }
 }
 
-function ensureCleanDirectory(directoryPath) {
+function ensureCleanDirectory(directoryPath: string): void {
   fs.rmSync(directoryPath, { recursive: true, force: true });
   fs.mkdirSync(directoryPath, { recursive: true });
 }
 
-function flattenSingleExtractedDirectory(directoryPath) {
+function flattenSingleExtractedDirectory(directoryPath: string): void {
   const childNames = fs
     .readdirSync(directoryPath)
     .filter((childName) => childName !== "README.md" && childName !== ".DS_Store");
@@ -124,7 +139,12 @@ function flattenSingleExtractedDirectory(directoryPath) {
     return;
   }
 
-  const extractedRoot = path.join(directoryPath, childNames[0]);
+  const childName = childNames[0];
+  if (!childName) {
+    return;
+  }
+
+  const extractedRoot = path.join(directoryPath, childName);
   if (!fs.statSync(extractedRoot).isDirectory()) {
     return;
   }
@@ -136,7 +156,7 @@ function flattenSingleExtractedDirectory(directoryPath) {
   fs.rmSync(extractedRoot, { recursive: true, force: true });
 }
 
-function createWindowsGuiRuntime(sourcePath, outputPath) {
+function createWindowsGuiRuntime(sourcePath: string, outputPath: string): void {
   if (!fs.existsSync(sourcePath)) {
     throw new Error(`Missing Windows Node runtime at ${sourcePath}`);
   }
@@ -157,7 +177,7 @@ function createWindowsGuiRuntime(sourcePath, outputPath) {
   fs.writeFileSync(outputPath, executable);
 }
 
-function downloadFile(url, outputPath) {
+function downloadFile(url: string, outputPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const fileStream = fs.createWriteStream(outputPath);
 
@@ -170,9 +190,10 @@ function downloadFile(url, outputPath) {
       },
       (response) => {
         if (response.statusCode && response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+          const redirectUrl = response.headers.location;
           fileStream.close(() => {
             fs.rmSync(outputPath, { force: true });
-            downloadFile(response.headers.location, outputPath).then(resolve, reject);
+            downloadFile(redirectUrl, outputPath).then(resolve, reject);
           });
           return;
         }
@@ -187,7 +208,7 @@ function downloadFile(url, outputPath) {
 
         response.pipe(fileStream);
         fileStream.on("finish", () => {
-          fileStream.close(resolve);
+          fileStream.close(() => resolve());
         });
       }
     );
@@ -201,11 +222,11 @@ function downloadFile(url, outputPath) {
   });
 }
 
-async function ensureRuntime(runtimeTarget) {
-  const config = runtimeConfigs[runtimeTarget];
-  if (!config) {
+async function ensureRuntime(runtimeTarget: string | undefined): Promise<void> {
+  if (!isReleaseTarget(runtimeTarget)) {
     throw new Error(`Unsupported runtime target "${runtimeTarget}". Use "windows" or "mac-arm64".`);
   }
+  const config = runtimeConfigs[runtimeTarget];
 
   if (fs.existsSync(config.requiredFile)) {
     console.log(`Using existing vendored Node runtime for ${runtimeTarget} at ${config.requiredFile}`);
@@ -249,6 +270,6 @@ async function ensureRuntime(runtimeTarget) {
 }
 
 ensureRuntime(target).catch((error) => {
-  console.error(error.message);
+  console.error(errorMessage(error));
   process.exit(1);
 });

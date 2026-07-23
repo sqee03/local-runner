@@ -3,6 +3,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { resolveProjectRoot } from "./runtime-paths.js";
+import { errorMessage } from "./node-types.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,7 +23,7 @@ const iconEntries: ReadonlyArray<readonly [string, string, number]> = [
   ["ic10", "icon_1024x1024.png", 1024]
 ];
 
-function ensureCommand(commandName) {
+function ensureCommand(commandName: string): void {
   const result = spawnSync(commandName, ["--help"], {
     stdio: "ignore"
   });
@@ -32,7 +33,7 @@ function ensureCommand(commandName) {
   }
 }
 
-function resizePng(outputPath, size) {
+function resizePng(outputPath: string, size: number): void {
   const result = spawnSync(
     "sips",
     ["-z", String(size), String(size), sourcePngPath, "--out", outputPath],
@@ -46,7 +47,7 @@ function resizePng(outputPath, size) {
   }
 }
 
-function main() {
+function main(): void {
   if (!fs.existsSync(sourcePngPath)) {
     throw new Error(`Missing macOS app icon source at ${sourcePngPath}`);
   }
@@ -90,6 +91,6 @@ function main() {
 try {
   main();
 } catch (error) {
-  console.error(error.message);
+  console.error(errorMessage(error));
   process.exit(1);
 }

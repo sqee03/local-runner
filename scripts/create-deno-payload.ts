@@ -3,6 +3,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { resolveProjectRoot } from "./runtime-paths.js";
+import { type ReleaseTarget, errorMessage } from "./node-types.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,7 +13,25 @@ const packagedRuntimeSource = path.join(projectRoot, ".tmp", "packaged-runtime")
 
 const target = process.argv[2];
 
-const runtimeSources = {
+interface PayloadSource {
+  readonly source: string;
+  readonly target: string;
+}
+
+interface PayloadFile {
+  readonly path: string;
+  readonly mode: number;
+  readonly base64: string;
+}
+
+interface PayloadManifest {
+  readonly version: 1;
+  readonly target: ReleaseTarget;
+  readonly hash: string;
+  readonly files: ReadonlyArray<PayloadFile>;
+}
+
+const runtimeSources: Record<ReleaseTarget, ReadonlyArray<PayloadSource>> = {
   windows: [
     {
       source: ".tmp/build-tools/windows-node-x64/node.exe",
@@ -31,12 +50,12 @@ const runtimeSources = {
   ]
 };
 
-const targetSources = {
+const targetSources: Record<ReleaseTarget, ReadonlyArray<PayloadSource>> = {
   windows: [],
   "mac-arm64": []
 };
 
-const requiredRuntimeFiles = {
+const requiredRuntimeFiles: Record<ReleaseTarget, ReadonlyArray<string>> = {
   windows: [
     ".tmp/build-tools/windows-node-x64/node.exe",
     ".tmp/build-tools/windows-node-x64/nodew.exe"
@@ -44,7 +63,7 @@ const requiredRuntimeFiles = {
   "mac-arm64": [".tmp/build-tools/macos-arm64-node/bin/node"]
 };
 
-const baseSources = [
+const baseSources: ReadonlyArray<PayloadSource> = [
   {
     source: path.relative(projectRoot, path.join(packagedRuntimeSource, "config")),
     target: "config"
@@ -75,18 +94,22 @@ const baseSources = [
   }
 ];
 
-function ensureExists(relativePath) {
+function ensureExists(relativePath: string): void {
   const absolutePath = path.join(projectRoot, relativePath);
   if (!fs.existsSync(absolutePath)) {
     throw new Error(`Missing payload source: ${absolutePath}`);
   }
 }
 
-function readMode(absolutePath) {
+function readMode(absolutePath: string): number {
   return fs.statSync(absolutePath).mode & 0o777;
 }
 
-function collectFiles(sourceRelativePath, targetRelativePath, entries) {
+function collectFiles(
+  sourceRelativePath: string,
+  targetRelativePath: string,
+  entries: PayloadFile[]
+): void {
   const absolutePath = path.join(projectRoot, sourceRelativePath);
   const stats = fs.statSync(absolutePath);
 
@@ -109,13 +132,17 @@ function collectFiles(sourceRelativePath, targetRelativePath, entries) {
   });
 }
 
-function buildPayloadManifest() {
-  if (!runtimeSources[target]) {
+function isReleaseTarget(value: string | undefined): value is ReleaseTarget {
+  return value === "windows" || value === "mac-arm64";
+}
+
+function buildPayloadManifest(): PayloadManifest {
+  if (!isReleaseTarget(target)) {
     throw new Error(`Unsupported payload target "${target}". Use "windows" or "mac-arm64".`);
   }
 
-  const sourcePaths = [...baseSources, ...runtimeSources[target], ...(targetSources[target] ?? [])];
-  const requiredFiles = requiredRuntimeFiles[target] ?? [];
+  const sourcePaths = [...baseSources, ...runtimeSources[target], ...targetSources[target]];
+  const requiredFiles = requiredRuntimeFiles[target];
 
   for (const sourcePath of sourcePaths) {
     ensureExists(sourcePath.source);
@@ -125,7 +152,7 @@ function buildPayloadManifest() {
     ensureExists(requiredFile);
   }
 
-  const files = [];
+  const files: PayloadFile[] = [];
   for (const sourcePath of sourcePaths) {
     collectFiles(sourcePath.source, sourcePath.target, files);
   }
@@ -154,7 +181,7 @@ function buildPayloadManifest() {
   };
 }
 
-function main() {
+function main(): void {
   const payload = buildPayloadManifest();
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(`${outputPath}`, `${JSON.stringify(payload)}\n`, "utf8");
@@ -164,6 +191,6 @@ function main() {
 try {
   main();
 } catch (error) {
-  console.error(error.message);
+  console.error(errorMessage(error));
   process.exit(1);
 }

@@ -4,6 +4,11 @@ import https from "node:https";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { resolveProjectRoot } from "./runtime-paths.js";
+import {
+  type ReleaseTarget,
+  errorMessage,
+  isReleaseTarget
+} from "./node-types.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,13 +17,21 @@ const projectRoot = resolveProjectRoot(__dirname);
 const denoVersion = "v2.9.2";
 const target = process.argv[2];
 
-const runtimeConfigs = {
+interface RuntimeConfig {
+  readonly destinationDir: string;
+  readonly requiredFile: string;
+  readonly archiveFileName: string;
+  readonly downloadUrl: string;
+  extract(archivePath: string, destinationDir: string): void;
+}
+
+const runtimeConfigs: Record<ReleaseTarget, RuntimeConfig> = {
   windows: {
     destinationDir: path.join(projectRoot, ".tmp", "build-tools", "windows-deno-x64"),
     requiredFile: path.join(projectRoot, ".tmp", "build-tools", "windows-deno-x64", "deno.exe"),
     archiveFileName: `deno-x86_64-pc-windows-msvc.zip`,
     downloadUrl: `https://github.com/denoland/deno/releases/download/${denoVersion}/deno-x86_64-pc-windows-msvc.zip`,
-    extract(archivePath, destinationDir) {
+    extract(archivePath: string, destinationDir: string): void {
       extractZipArchive(archivePath, destinationDir, "Windows Deno runtime archive");
     }
   },
@@ -27,13 +40,13 @@ const runtimeConfigs = {
     requiredFile: path.join(projectRoot, ".tmp", "build-tools", "macos-arm64-deno", "deno"),
     archiveFileName: `deno-aarch64-apple-darwin.zip`,
     downloadUrl: `https://github.com/denoland/deno/releases/download/${denoVersion}/deno-aarch64-apple-darwin.zip`,
-    extract(archivePath, destinationDir) {
+    extract(archivePath: string, destinationDir: string): void {
       extractZipArchive(archivePath, destinationDir, "macOS Deno runtime archive");
     }
   }
 };
 
-function ensureCommand(commandName) {
+function ensureCommand(commandName: string): void {
   const result = spawnSync(commandName, ["--version"], {
     stdio: "ignore"
   });
@@ -43,7 +56,7 @@ function ensureCommand(commandName) {
   }
 }
 
-function getAvailablePowerShell() {
+function getAvailablePowerShell(): string | null {
   for (const commandName of ["powershell.exe", "powershell", "pwsh.exe", "pwsh"]) {
     const result = spawnSync(commandName, ["-Command", "$PSVersionTable.PSVersion.ToString()"], {
       stdio: "ignore"
@@ -57,7 +70,7 @@ function getAvailablePowerShell() {
   return null;
 }
 
-function extractZipArchive(archivePath, destinationDir, label) {
+function extractZipArchive(archivePath: string, destinationDir: string, label: string): void {
   if (process.platform === "win32") {
     const powerShellCommand = getAvailablePowerShell();
 
@@ -89,12 +102,12 @@ function extractZipArchive(archivePath, destinationDir, label) {
   }
 }
 
-function ensureCleanDirectory(directoryPath) {
+function ensureCleanDirectory(directoryPath: string): void {
   fs.rmSync(directoryPath, { recursive: true, force: true });
   fs.mkdirSync(directoryPath, { recursive: true });
 }
 
-function downloadFile(url, outputPath) {
+function downloadFile(url: string, outputPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const fileStream = fs.createWriteStream(outputPath);
 
@@ -107,9 +120,10 @@ function downloadFile(url, outputPath) {
       },
       (response) => {
         if (response.statusCode && response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+          const redirectUrl = response.headers.location;
           fileStream.close(() => {
             fs.rmSync(outputPath, { force: true });
-            downloadFile(response.headers.location, outputPath).then(resolve, reject);
+            downloadFile(redirectUrl, outputPath).then(resolve, reject);
           });
           return;
         }
@@ -124,7 +138,7 @@ function downloadFile(url, outputPath) {
 
         response.pipe(fileStream);
         fileStream.on("finish", () => {
-          fileStream.close(resolve);
+          fileStream.close(() => resolve());
         });
       }
     );
@@ -138,11 +152,11 @@ function downloadFile(url, outputPath) {
   });
 }
 
-async function ensureRuntime(runtimeTarget) {
-  const config = runtimeConfigs[runtimeTarget];
-  if (!config) {
+async function ensureRuntime(runtimeTarget: string | undefined): Promise<void> {
+  if (!isReleaseTarget(runtimeTarget)) {
     throw new Error(`Unsupported Deno runtime target "${runtimeTarget}". Use "windows" or "mac-arm64".`);
   }
+  const config = runtimeConfigs[runtimeTarget];
 
   if (fs.existsSync(config.requiredFile)) {
     console.log(`Using existing vendored Deno runtime for ${runtimeTarget} at ${config.requiredFile}`);
@@ -172,6 +186,6 @@ async function ensureRuntime(runtimeTarget) {
 }
 
 ensureRuntime(target).catch((error) => {
-  console.error(error.message);
+  console.error(errorMessage(error));
   process.exit(1);
 });

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveProjectRoot } from "./runtime-paths.js";
+import { errorMessage } from "./node-types.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,7 +19,7 @@ const excludedRootFiles = new Set([
   "runner.exe"
 ]);
 
-function main() {
+function main(): void {
   if (!fs.existsSync(runnerPath)) {
     throw new Error(`Missing finalized Windows runner executable at ${runnerPath}`);
   }
@@ -47,6 +48,6 @@ function main() {
 try {
   main();
 } catch (error) {
-  console.error(error.message);
+  console.error(errorMessage(error));
   process.exit(1);
 }

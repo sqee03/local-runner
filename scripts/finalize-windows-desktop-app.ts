@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveProjectRoot } from "./runtime-paths.js";
+import { errorMessage } from "./node-types.js";
 import * as PELibrary from "pe-library";
 import * as ResEdit from "resedit";
 
@@ -12,7 +13,7 @@ const runnerPath = path.join(projectRoot, "release", "windows", "runner", "runne
 const iconPath = path.join(projectRoot, "desktop", "assets", "app-icon.ico");
 const temporaryRunnerPath = `${runnerPath}.with-icon`;
 
-function main() {
+function main(): void {
   if (!fs.existsSync(runnerPath)) {
     throw new Error(`Missing Windows runner executable at ${runnerPath}`);
   }
@@ -43,6 +44,6 @@ try {
   main();
 } catch (error) {
   fs.rmSync(temporaryRunnerPath, { force: true });
-  console.error(error.message);
+  console.error(errorMessage(error));
   process.exit(1);
 }

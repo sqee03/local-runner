@@ -2,10 +2,25 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import net from "node:net";
-import { spawn } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import type { Readable, Writable } from "node:stream";
 import { inspect } from "node:util";
 import { fileURLToPath } from "node:url";
 import { createConfigStore } from "./config-store.js";
+import {
+  type ClientConfigSnapshot,
+  type ClientRuntimeState,
+  type ConfigSnapshot,
+  type JsonObject,
+  type PackageDefinition,
+  type PackageName,
+  type PackageRuntimeConfig,
+  type PackageStatus,
+  type RuntimeState,
+  errorMessage,
+  isJsonObject
+} from "./node-types.js";
 import { resolveProjectRoot } from "./runtime-paths.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -24,7 +39,13 @@ const runnerPortOverride = Number.parseInt(
   process.env.PACKAGE_RUNNER_PORT_OVERRIDE ?? "",
   10
 );
-const packagePortOverrides = {
+interface PackagePortOverrides {
+  readonly frontendPackage: number;
+  readonly mqttTcp: number;
+  readonly mqttWs: number;
+}
+
+const packagePortOverrides: PackagePortOverrides = {
   frontendPackage: Number.parseInt(process.env.PACKAGE_RUNNER_FRONTEND_PORT_OVERRIDE ?? "", 10),
   mqttTcp: Number.parseInt(process.env.PACKAGE_RUNNER_MQTT_TCP_PORT_OVERRIDE ?? "", 10),
   mqttWs: Number.parseInt(process.env.PACKAGE_RUNNER_MQTT_WS_PORT_OVERRIDE ?? "", 10)
@@ -38,7 +59,21 @@ const nativeConsole = {
   error: console.error.bind(console)
 };
 
-function formatLogValue(value) {
+type LogLevel = "error" | "info" | "stderr" | "stdout" | "warn";
+type RuntimePorts = {
+  runner: number;
+  frontendPackage: number;
+  mqttTcp: number;
+  mqttWs: number;
+};
+
+interface Logger {
+  info(...values: ReadonlyArray<unknown>): void;
+  warn(...values: ReadonlyArray<unknown>): void;
+  error(...values: ReadonlyArray<unknown>): void;
+}
+
+function formatLogValue(value: unknown): string {
   if (value instanceof Error) {
     return value.stack ?? value.message;
   }
@@ -46,7 +81,11 @@ function formatLogValue(value) {
   return typeof value === "string" ? value : inspect(value, { depth: 5, breakLength: Infinity });
 }
 
-function appendLogLine(filePath, level, values) {
+function appendLogLine(
+  filePath: string,
+  level: LogLevel,
+  values: ReadonlyArray<unknown>
+): void {
   const message = values.map(formatLogValue).join(" ");
 
   try {
@@ -56,11 +95,11 @@ function appendLogLine(filePath, level, values) {
       "utf8"
     );
   } catch (error) {
-    nativeConsole.error(`Failed to write log file ${filePath}: ${error.message}`);
+    nativeConsole.error(`Failed to write log file ${filePath}: ${errorMessage(error)}`);
   }
 }
 
-const logger = {
+const logger: Logger = {
   info(...values) {
     appendLogLine(orchestratorLogPath, "info", values);
     nativeConsole.info(...values);
@@ -77,16 +116,20 @@ const logger = {
 
 logger.info(`Orchestrator process started (pid=${process.pid}).`);
 
-function attachPackageOutput(packageName, childProcess) {
+function attachPackageOutput(packageName: PackageName, childProcess: ChildProcess): void {
   const logPath = path.join(logDir, `${packageName}.log`);
 
   appendLogLine(logPath, "info", [`Process started (pid=${childProcess.pid}).`]);
 
-  const forwardStream = (stream, level, terminalStream) => {
+  const forwardStream = (stream: Readable | null, level: LogLevel, terminalStream: Writable) => {
+    if (!stream) {
+      return;
+    }
+
     let pending = "";
 
     stream.setEncoding("utf8");
-    stream.on("data", (chunk) => {
+    stream.on("data", (chunk: string) => {
       if (shellMode !== "desktop") {
         terminalStream.write(chunk);
       }
@@ -108,7 +151,7 @@ function attachPackageOutput(packageName, childProcess) {
   forwardStream(childProcess.stderr, "stderr", process.stderr);
 }
 
-const runtimeState = {
+const runtimeState: RuntimeState = {
   isRunning: false,
   isTransitioning: false,
   lastError: null,
@@ -125,7 +168,7 @@ const runtimeState = {
   }
 };
 
-function applyRuntimePortOverrides(configSnapshot) {
+function applyRuntimePortOverrides(configSnapshot: ConfigSnapshot): ConfigSnapshot {
   return {
     ...configSnapshot,
     effective: {
@@ -149,7 +192,7 @@ function applyRuntimePortOverrides(configSnapshot) {
   };
 }
 
-function contentTypeFor(filePath) {
+function contentTypeFor(filePath: string): string {
   if (filePath.endsWith(".html")) return "text/html; charset=utf-8";
   if (filePath.endsWith(".js")) return "text/javascript; charset=utf-8";
   if (filePath.endsWith(".css")) return "text/css; charset=utf-8";
@@ -158,11 +201,11 @@ function contentTypeFor(filePath) {
   return "application/octet-stream";
 }
 
-function parseJsonBody(req) {
+function parseJsonBody(req: IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let body = "";
 
-    req.on("data", (chunk) => {
+    req.on("data", (chunk: Buffer | string) => {
       body += chunk;
     });
 
@@ -178,12 +221,12 @@ function parseJsonBody(req) {
   });
 }
 
-function sendJson(res, statusCode, payload) {
+function sendJson(res: ServerResponse, statusCode: number, payload: unknown): void {
   res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload));
 }
 
-function normalizeConfigForClient(configSnapshot) {
+function normalizeConfigForClient(configSnapshot: ConfigSnapshot): ClientConfigSnapshot {
   return {
     defaults: configSnapshot.defaults,
     userOverrides: configSnapshot.userOverrides,
@@ -195,7 +238,7 @@ function normalizeConfigForClient(configSnapshot) {
   };
 }
 
-function normalizeRuntimeForClient() {
+function normalizeRuntimeForClient(): ClientRuntimeState {
   return {
     isRunning: runtimeState.isRunning,
     isTransitioning: runtimeState.isTransitioning,
@@ -205,13 +248,13 @@ function normalizeRuntimeForClient() {
   };
 }
 
-function openBrowser(url) {
+function openBrowser(url: string): void {
   if (process.env.NO_OPEN_BROWSER === "1") {
     return;
   }
 
   const platform = process.platform;
-  let childProcess = null;
+  let childProcess: ChildProcess;
 
   try {
     if (platform === "win32") {
@@ -231,11 +274,11 @@ function openBrowser(url) {
     });
     childProcess.unref();
   } catch (error) {
-    logger.error(`Failed to open browser for ${url}: ${error.message}`);
+    logger.error(`Failed to open browser for ${url}: ${errorMessage(error)}`);
   }
 }
 
-function waitForHttpReady(url, timeoutMs = 15000) {
+function waitForHttpReady(url: string, timeoutMs = 15000): Promise<void> {
   return new Promise((resolve, reject) => {
     const deadline = Date.now() + timeoutMs;
 
@@ -259,7 +302,7 @@ function waitForHttpReady(url, timeoutMs = 15000) {
   });
 }
 
-function canBindPort(host, port) {
+function canBindPort(host: string, port: number): Promise<boolean> {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
 
@@ -278,7 +321,7 @@ function canBindPort(host, port) {
   });
 }
 
-async function findAvailablePort(host, preferredPort) {
+async function findAvailablePort(host: string, preferredPort: number): Promise<number> {
   if (await canBindPort(host, preferredPort)) {
     return preferredPort;
   }
@@ -294,11 +337,13 @@ async function findAvailablePort(host, preferredPort) {
   );
 }
 
-async function resolveRuntimePorts(configSnapshot) {
+async function resolveRuntimePorts(
+  configSnapshot: ConfigSnapshot
+): Promise<ConfigSnapshot["effective"]["ports"]> {
   const host = configSnapshot.effective.interfaces.host;
   const configuredPorts = configSnapshot.effective.ports;
 
-  const ports = {
+  const ports: RuntimePorts = {
     ...configuredPorts,
     runner: Number.isFinite(runnerPortOverride) ? runnerPortOverride : configuredPorts.runner,
     frontendPackage: Number.isFinite(packagePortOverrides.frontendPackage)
@@ -312,7 +357,7 @@ async function resolveRuntimePorts(configSnapshot) {
       : configuredPorts.mqttWs
   };
 
-  const portMappings = [
+  const portMappings: ReadonlyArray<readonly [keyof typeof ports, string]> = [
     ["frontendPackage", "frontend package"],
     ["mqttTcp", "MQTT TCP"],
     ["mqttWs", "MQTT WebSocket"]
@@ -331,11 +376,11 @@ async function resolveRuntimePorts(configSnapshot) {
   return ports;
 }
 
-function buildPackageRuntimeConfig(configSnapshot) {
+function buildPackageRuntimeConfig(configSnapshot: ConfigSnapshot): PackageRuntimeConfig {
   const effective = configSnapshot.effective;
   const host = effective.interfaces.host;
   const ports = effective.ports;
-  const resolveRuntimeEntry = (entryPath) => {
+  const resolveRuntimeEntry = (entryPath: string): string => {
     const projectEntryPath = path.resolve(projectRoot, entryPath);
     if (fs.existsSync(projectEntryPath)) {
       return projectEntryPath;
@@ -395,8 +440,8 @@ function buildPackageRuntimeConfig(configSnapshot) {
   };
 }
 
-function attachPackageExitHandler(packageName, childProcess) {
-  childProcess.on("exit", (code, signal) => {
+function attachPackageExitHandler(packageName: PackageName, childProcess: ChildProcess): void {
+  childProcess.on("exit", (code: number | null, signal: NodeJS.Signals | null) => {
     appendLogLine(path.join(logDir, `${packageName}.log`), "info", [
       `Process exited (code=${code ?? "none"}, signal=${signal ?? "none"}).`
     ]);
@@ -414,7 +459,7 @@ function attachPackageExitHandler(packageName, childProcess) {
     }
   });
 
-  childProcess.on("error", (error) => {
+  childProcess.on("error", (error: Error) => {
     runtimeState.packageProcesses[packageName] = null;
     runtimeState.packageStatus[packageName] = "stopped";
     runtimeState.lastError = `${packageName.toUpperCase()} package failed to start: ${error.message}`;
@@ -425,7 +470,7 @@ function attachPackageExitHandler(packageName, childProcess) {
   });
 }
 
-function spawnPackage(packageName, definition) {
+function spawnPackage(packageName: PackageName, definition: PackageDefinition): ChildProcess {
   runtimeState.packageStatus[packageName] = "starting";
   const childProcess = spawn(definition.executable, [definition.entry], {
     cwd: definition.cwd,
@@ -441,7 +486,7 @@ function spawnPackage(packageName, definition) {
   return childProcess;
 }
 
-function waitForChildExit(childProcess, timeoutMs) {
+function waitForChildExit(childProcess: ChildProcess, timeoutMs: number): Promise<boolean> {
   return new Promise((resolve) => {
     if (childProcess.exitCode !== null || childProcess.signalCode !== null) {
       resolve(true);
@@ -462,8 +507,8 @@ function waitForChildExit(childProcess, timeoutMs) {
   });
 }
 
-function terminateChildProcess(childProcess) {
-  for (const signal of ["SIGTERM", "SIGKILL"]) {
+function terminateChildProcess(childProcess: ChildProcess): void {
+  for (const signal of ["SIGTERM", "SIGKILL"] as const) {
     try {
       childProcess.kill(signal);
       return;
@@ -473,7 +518,7 @@ function terminateChildProcess(childProcess) {
   }
 }
 
-async function stopProcess(packageName) {
+async function stopProcess(packageName: PackageName): Promise<void> {
   const childProcess = runtimeState.packageProcesses[packageName];
   if (!childProcess) {
     runtimeState.packageStatus[packageName] = "stopped";
@@ -493,7 +538,7 @@ async function stopProcess(packageName) {
   runtimeState.packageStatus[packageName] = "stopped";
 }
 
-async function startRuntime() {
+async function startRuntime(): Promise<ClientRuntimeState> {
   if (runtimeState.isRunning) {
     return normalizeRuntimeForClient();
   }
@@ -517,9 +562,9 @@ async function startRuntime() {
     runtimeState.isRunning = true;
     logger.info("FE, BE, and MQTT packages are running.");
   } catch (error) {
-    runtimeState.lastError = error.message;
-    logger.error(`Package startup failed: ${error.message}`);
-    await Promise.all(["fe", "be", "mqtt"].map((name) => stopProcess(name).catch(() => {})));
+    runtimeState.lastError = errorMessage(error);
+    logger.error(`Package startup failed: ${errorMessage(error)}`);
+    await Promise.all((["fe", "be", "mqtt"] as const).map((name) => stopProcess(name).catch(() => {})));
     throw error;
   } finally {
     runtimeState.isTransitioning = false;
@@ -528,7 +573,7 @@ async function startRuntime() {
   return normalizeRuntimeForClient();
 }
 
-async function stopRuntime() {
+async function stopRuntime(): Promise<ClientRuntimeState> {
   if (!runtimeState.isRunning && !runtimeState.isTransitioning) {
     runtimeState.lastError = null;
     return normalizeRuntimeForClient();
@@ -539,7 +584,7 @@ async function stopRuntime() {
   runtimeState.lastError = null;
   runtimeState.isRunning = false;
 
-  for (const packageName of ["fe", "be", "mqtt"]) {
+  for (const packageName of ["fe", "be", "mqtt"] as const) {
     await stopProcess(packageName).catch(() => {});
   }
 
@@ -548,7 +593,7 @@ async function stopRuntime() {
   return normalizeRuntimeForClient();
 }
 
-function createStaticServer() {
+function createStaticServer(): http.Server {
   return http.createServer((req, res) => {
     const rawPath = req.url?.split("?")[0] ?? "/";
 
@@ -556,7 +601,7 @@ function createStaticServer() {
       try {
         sendJson(res, 200, normalizeConfigForClient(configStore.readConfig()));
       } catch (error) {
-        sendJson(res, 500, { error: error.message });
+        sendJson(res, 500, { error: errorMessage(error) });
       }
       return;
     }
@@ -564,13 +609,15 @@ function createStaticServer() {
     if (rawPath === "/api/config" && req.method === "POST") {
       parseJsonBody(req)
         .then((body) => {
-          const requestBody = body && typeof body === "object" ? body : {};
-          const nextOverrides = "userOverrides" in requestBody ? requestBody.userOverrides : requestBody;
-          const nextConfig = configStore.writeUserOverrides(nextOverrides);
+          const requestBody = isJsonObject(body) ? body : {};
+          const nextOverrides = requestBody.userOverrides;
+          const nextConfig = configStore.writeUserOverrides(
+            isJsonObject(nextOverrides) ? nextOverrides : requestBody
+          );
           sendJson(res, 200, normalizeConfigForClient(nextConfig));
         })
         .catch((error) => {
-          sendJson(res, 400, { error: error.message });
+          sendJson(res, 400, { error: errorMessage(error) });
         });
       return;
     }
@@ -583,14 +630,14 @@ function createStaticServer() {
     if (rawPath === "/api/runtime/start" && req.method === "POST") {
       startRuntime()
         .then((payload) => sendJson(res, 200, payload))
-        .catch((error) => sendJson(res, 500, { error: error.message }));
+        .catch((error: unknown) => sendJson(res, 500, { error: errorMessage(error) }));
       return;
     }
 
     if (rawPath === "/api/runtime/stop" && req.method === "POST") {
       stopRuntime()
         .then((payload) => sendJson(res, 200, payload))
-        .catch((error) => sendJson(res, 500, { error: error.message }));
+        .catch((error: unknown) => sendJson(res, 500, { error: errorMessage(error) }));
       return;
     }
 
@@ -615,7 +662,7 @@ function createStaticServer() {
   });
 }
 
-async function main() {
+async function main(): Promise<void> {
   if (!fs.existsSync(distDir)) {
     throw new Error("Missing dist folder. Run the build first.");
   }
@@ -634,7 +681,7 @@ async function main() {
   const shutdown = async () => {
     logger.info("Orchestrator shutdown begin.");
     await stopRuntime().catch(() => {});
-    await new Promise((resolve) => staticServer.close(resolve));
+    await new Promise<void>((resolve) => staticServer.close(() => resolve()));
     process.exit(0);
   };
 
@@ -659,8 +706,8 @@ async function main() {
         openBrowser(frontendAppUrl);
       }
     } catch (error) {
-      runtimeState.lastError = error.message;
-      logger.error(`Automatic app launch failed: ${error.message}`);
+      runtimeState.lastError = errorMessage(error);
+      logger.error(`Automatic app launch failed: ${errorMessage(error)}`);
       if (shellMode !== "desktop") {
         openBrowser(runnerUrl);
       }

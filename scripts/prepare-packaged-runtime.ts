@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveProjectRoot } from "./runtime-paths.js";
+import { errorMessage, isJsonObject } from "./node-types.js";
 import { build } from "esbuild";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -9,32 +10,32 @@ const __dirname = path.dirname(__filename);
 const projectRoot = resolveProjectRoot(__dirname);
 const stagingRoot = path.join(projectRoot, ".tmp", "packaged-runtime");
 
-const nodeBundles = [
+const nodeBundles: ReadonlyArray<readonly [string, string]> = [
   ["scripts/mvp-orchestrator.ts", "scripts/mvp-orchestrator.js"],
   ["injections/fe/server.ts", "injections/fe/server.js"],
   ["injections/be/server.ts", "injections/be/server.js"],
   ["injections/mqtt/server.ts", "injections/mqtt/server.js"]
 ];
 
-function resolve(relativePath) {
+function resolve(relativePath: string): string {
   return path.join(projectRoot, relativePath);
 }
 
-function resolveStaged(relativePath) {
+function resolveStaged(relativePath: string): string {
   return path.join(stagingRoot, relativePath);
 }
 
-function copyDirectory(relativePath) {
+function copyDirectory(relativePath: string): void {
   fs.cpSync(resolve(relativePath), resolveStaged(relativePath), {
     recursive: true
   });
 }
 
-function copyFile(relativePath) {
+function copyFile(relativePath: string): void {
   fs.copyFileSync(resolve(relativePath), resolveStaged(relativePath));
 }
 
-async function bundleNodeEntry(sourcePath, outputPath) {
+async function bundleNodeEntry(sourcePath: string, outputPath: string): Promise<void> {
   await build({
     entryPoints: [resolve(sourcePath)],
     outfile: resolveStaged(outputPath),
@@ -51,7 +52,23 @@ async function bundleNodeEntry(sourcePath, outputPath) {
   });
 }
 
-async function bundleFrontendAssets() {
+function readPackageMetadata(): { readonly name: string; readonly version: string } {
+  const parsed: unknown = JSON.parse(fs.readFileSync(resolve("package.json"), "utf8"));
+  if (
+    !isJsonObject(parsed) ||
+    typeof parsed.name !== "string" ||
+    typeof parsed.version !== "string"
+  ) {
+    throw new Error("package.json is missing string name/version fields.");
+  }
+
+  return {
+    name: parsed.name,
+    version: parsed.version
+  };
+}
+
+async function bundleFrontendAssets(): Promise<void> {
   const frontendDir = resolveStaged("injections/fe");
   fs.mkdirSync(frontendDir, { recursive: true });
   const minifiedHtml = fs
@@ -85,14 +102,14 @@ async function bundleFrontendAssets() {
   ]);
 }
 
-async function main() {
+async function main(): Promise<void> {
   fs.rmSync(stagingRoot, { recursive: true, force: true });
   fs.mkdirSync(stagingRoot, { recursive: true });
 
   copyDirectory("config");
   copyDirectory("dist");
   copyFile("version.json");
-  const packageMetadata = JSON.parse(fs.readFileSync(resolve("package.json"), "utf8"));
+  const packageMetadata = readPackageMetadata();
   fs.writeFileSync(
     resolveStaged("package.json"),
     `${JSON.stringify({
@@ -115,6 +132,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error.message);
+  console.error(errorMessage(error));
   process.exit(1);
 });

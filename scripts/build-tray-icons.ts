@@ -10,7 +10,7 @@ const projectRoot = resolveProjectRoot(__dirname);
 const assetsDir = path.join(projectRoot, "desktop", "assets");
 const outputSize = 22;
 
-function main() {
+function main(): void {
   fs.mkdirSync(assetsDir, { recursive: true });
 
   const lightIcon = encodePng(outputSize, outputSize, renderTrayIcon(outputSize, [18, 18, 18]));

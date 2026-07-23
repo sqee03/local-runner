@@ -12,13 +12,18 @@ const pngPath = path.join(assetsDir, "app-icon.png");
 const icoPath = path.join(assetsDir, "app-icon.ico");
 const iconSizes = [16, 20, 24, 32, 40, 48, 64, 96, 128, 256];
 
-function buildIco(images) {
+interface IconImage {
+  readonly size: number;
+  readonly png: Buffer;
+}
+
+function buildIco(images: ReadonlyArray<IconImage>): Buffer {
   const header = Buffer.alloc(6);
   header.writeUInt16LE(0, 0);
   header.writeUInt16LE(1, 2);
   header.writeUInt16LE(images.length, 4);
 
-  const entries = [];
+  const entries: Buffer[] = [];
   let imageOffset = 6 + images.length * 16;
 
   for (const { size, png } of images) {
@@ -40,7 +45,7 @@ function buildIco(images) {
   return Buffer.concat([header, ...entries, ...images.map(({ png }) => png)]);
 }
 
-function main() {
+function main(): void {
   fs.mkdirSync(assetsDir, { recursive: true });
 
   const sourcePng = encodePng(512, 512, renderAppIcon(512));

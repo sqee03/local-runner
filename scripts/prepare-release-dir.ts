@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveProjectRoot } from "./runtime-paths.js";
+import type { ReleaseTarget } from "./node-types.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,7 +11,7 @@ const releaseRoot = path.join(projectRoot, "release");
 const tempRoot = path.join(projectRoot, ".tmp");
 const target = process.argv[2];
 
-const releaseTargets = {
+const releaseTargets: Record<ReleaseTarget, string> = {
   windows: path.join(releaseRoot, "windows"),
   "mac-arm64": path.join(releaseRoot, "mac")
 };
@@ -25,11 +26,15 @@ const legacyReleaseArtifacts = [
   path.join(releaseRoot, ".DS_Store")
 ];
 
-if (!target || !releaseTargets[target]) {
+function isReleaseTarget(value: string | undefined): value is ReleaseTarget {
+  return value === "windows" || value === "mac-arm64";
+}
+
+if (!isReleaseTarget(target)) {
   throw new Error(`Unknown release target: ${target ?? "<missing>"}`);
 }
 
-function removePath(targetPath) {
+function removePath(targetPath: string): void {
   fs.rmSync(targetPath, {
     recursive: true,
     force: true,

@@ -2,12 +2,13 @@ import zlib from "node:zlib";
 
 const designSize = 220;
 const samplesPerAxis = 4;
+type Rgb = readonly [number, number, number];
 
-function crc32(buffer) {
+function crc32(buffer: Buffer): number {
   let crc = 0xffffffff;
 
   for (let index = 0; index < buffer.length; index += 1) {
-    crc ^= buffer[index];
+    crc ^= buffer[index] ?? 0;
     for (let bit = 0; bit < 8; bit += 1) {
       crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
     }
@@ -16,7 +17,7 @@ function crc32(buffer) {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-function pngChunk(type, data) {
+function pngChunk(type: string, data: Buffer): Buffer {
   const typeBuffer = Buffer.from(type, "ascii");
   const lengthBuffer = Buffer.alloc(4);
   lengthBuffer.writeUInt32BE(data.length, 0);
@@ -27,7 +28,7 @@ function pngChunk(type, data) {
   return Buffer.concat([lengthBuffer, typeBuffer, data, crcBuffer]);
 }
 
-export function encodePng(width, height, rgbaBytes) {
+export function encodePng(width: number, height: number, rgbaBytes: Uint8Array): Buffer {
   const rowStride = width * 4 + 1;
   const raw = Buffer.alloc(rowStride * height);
 
@@ -37,10 +38,10 @@ export function encodePng(width, height, rgbaBytes) {
     for (let x = 0; x < width; x += 1) {
       const sourceOffset = (y * width + x) * 4;
       const targetOffset = y * rowStride + 1 + x * 4;
-      raw[targetOffset] = rgbaBytes[sourceOffset];
-      raw[targetOffset + 1] = rgbaBytes[sourceOffset + 1];
-      raw[targetOffset + 2] = rgbaBytes[sourceOffset + 2];
-      raw[targetOffset + 3] = rgbaBytes[sourceOffset + 3];
+      raw[targetOffset] = rgbaBytes[sourceOffset] ?? 0;
+      raw[targetOffset + 1] = rgbaBytes[sourceOffset + 1] ?? 0;
+      raw[targetOffset + 2] = rgbaBytes[sourceOffset + 2] ?? 0;
+      raw[targetOffset + 3] = rgbaBytes[sourceOffset + 3] ?? 0;
     }
   }
 
@@ -58,7 +59,15 @@ export function encodePng(width, height, rgbaBytes) {
   ]);
 }
 
-function sdRoundedRect(x, y, cx, cy, width, height, radius) {
+function sdRoundedRect(
+  x: number,
+  y: number,
+  cx: number,
+  cy: number,
+  width: number,
+  height: number,
+  radius: number
+): number {
   const dx = Math.abs(x - cx) - width / 2 + radius;
   const dy = Math.abs(y - cy) - height / 2 + radius;
   const qx = Math.max(dx, 0);
@@ -66,15 +75,29 @@ function sdRoundedRect(x, y, cx, cy, width, height, radius) {
   return Math.hypot(qx, qy) + Math.min(Math.max(dx, dy), 0) - radius;
 }
 
-function pointInCircle(x, y, cx, cy, radius) {
+function pointInCircle(
+  x: number,
+  y: number,
+  cx: number,
+  cy: number,
+  radius: number
+): boolean {
   return Math.hypot(x - cx, y - cy) <= radius;
 }
 
-function pointInRoundedRect(x, y, cx, cy, width, height, radius) {
+function pointInRoundedRect(
+  x: number,
+  y: number,
+  cx: number,
+  cy: number,
+  width: number,
+  height: number,
+  radius: number
+): boolean {
   return sdRoundedRect(x, y, cx, cy, width, height, radius) <= 0;
 }
 
-function pointInTraySymbol(x, y) {
+function pointInTraySymbol(x: number, y: number): boolean {
   const topBar = pointInRoundedRect(x, y, 0, -52, 100, 34, 17);
   const midBar = pointInRoundedRect(x, y, 0, 0, 84, 34, 17);
   const bottomBar = pointInRoundedRect(x, y, 0, 52, 100, 34, 17);
@@ -84,7 +107,11 @@ function pointInTraySymbol(x, y) {
   return topBar || midBar || bottomBar || upperStem || lowerStem;
 }
 
-function sampleCoverage(size, pixelX, pixelY) {
+function sampleCoverage(
+  size: number,
+  pixelX: number,
+  pixelY: number
+): { readonly circleHits: number; readonly symbolHits: number } {
   const scale = designSize / size;
   const center = designSize / 2;
   const sampleStep = scale / samplesPerAxis;
@@ -110,7 +137,7 @@ function sampleCoverage(size, pixelX, pixelY) {
   return { circleHits, symbolHits };
 }
 
-export function renderTrayIcon(size, foregroundRgb) {
+export function renderTrayIcon(size: number, foregroundRgb: Rgb): Uint8Array {
   const pixels = new Uint8Array(size * size * 4);
   const totalSamples = samplesPerAxis * samplesPerAxis;
 
@@ -129,11 +156,11 @@ export function renderTrayIcon(size, foregroundRgb) {
   return pixels;
 }
 
-export function renderAppIcon(size) {
+export function renderAppIcon(size: number): Uint8Array {
   const pixels = new Uint8Array(size * size * 4);
   const totalSamples = samplesPerAxis * samplesPerAxis;
-  const circleRgb = [12, 14, 16];
-  const symbolRgb = [255, 255, 255];
+  const circleRgb: Rgb = [12, 14, 16];
+  const symbolRgb: Rgb = [255, 255, 255];
 
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
@@ -144,7 +171,7 @@ export function renderAppIcon(size) {
       if (circleHits > 0) {
         for (let channel = 0; channel < 3; channel += 1) {
           pixels[offset + channel] = Math.round(
-            (circleRgb[channel] * circleOnlyHits + symbolRgb[channel] * symbolHits) /
+            ((circleRgb[channel] ?? 0) * circleOnlyHits + (symbolRgb[channel] ?? 0) * symbolHits) /
               circleHits
           );
         }

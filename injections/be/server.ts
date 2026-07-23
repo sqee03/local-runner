@@ -7,10 +7,10 @@ const client = mqtt.connect(MQTT_TCP_URL, {
   reconnectPeriod: 1000,
   connectTimeout: 4000
 });
-let heartbeatTimer = null;
+let heartbeatTimer: NodeJS.Timeout | null = null;
 let isShuttingDown = false;
 
-function publishHeartbeat() {
+function publishHeartbeat(): void {
   if (isShuttingDown) {
     return;
   }
@@ -44,7 +44,7 @@ client.on("error", (error) => {
   console.error("Backend package MQTT error:", error.message);
 });
 
-async function shutdown() {
+async function shutdown(): Promise<void> {
   if (isShuttingDown) {
     return;
   }

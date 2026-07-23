@@ -4,6 +4,7 @@ import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { resolveProjectRoot } from "./runtime-paths.js";
+import type { ReleaseTarget } from "./node-types.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,22 +14,27 @@ const taskName = process.argv[2];
 const target = process.argv[3];
 const stagedWindowsBackend = path.join(projectRoot, ".tmp", "windows-icon-backend");
 
-const denoBinaries = {
+const denoBinaries: Record<ReleaseTarget, string> = {
   windows: path.join(projectRoot, ".tmp", "build-tools", "windows-deno-x64", "deno.exe"),
   "mac-arm64": path.join(projectRoot, ".tmp", "build-tools", "macos-arm64-deno", "deno")
 };
 
-const hostTarget = process.platform === "win32" ? "windows" : process.platform === "darwin" ? "mac-arm64" : null;
+const hostTarget: ReleaseTarget | null =
+  process.platform === "win32" ? "windows" : process.platform === "darwin" ? "mac-arm64" : null;
 
 if (!taskName) {
   throw new Error("Missing Deno task name.");
 }
 
-if (!target || !denoBinaries[target]) {
+function isReleaseTarget(value: string | undefined): value is ReleaseTarget {
+  return value === "windows" || value === "mac-arm64";
+}
+
+if (!isReleaseTarget(target)) {
   throw new Error(`Unsupported Deno runtime target "${target ?? "<missing>"}".`);
 }
 
-function resolveDenoCommand() {
+function resolveDenoCommand(): string {
   if (hostTarget === target) {
     return denoBinaries[target];
   }
@@ -43,7 +49,7 @@ function resolveDenoCommand() {
   }
 
   throw new Error(
-    `Cross-target packaging for ${target} requires a host Deno installation because ${path.basename(denoBinaries[target])} cannot run on ${process.platform}.`
+    `Cross-target packaging for ${target} requires a host Deno installation because ${path.basename(denoBinaries[target as keyof typeof denoBinaries])} cannot run on ${process.platform}.`
   );
 }
 
