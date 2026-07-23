@@ -1034,7 +1034,7 @@ async function main() {
   const projectRoot = payloadRoot;
   const appVersion = loadAppVersion(projectRoot);
   const nodeExecutable = resolveNodeRuntimePath(projectRoot, shellMode);
-  const runnerEntry = path.join(projectRoot, "scripts", "mvp-orchestrator.js");
+  const runnerEntry = path.join(projectRoot, "scripts", "orchestrator.js");
   const configPaths = ensurePersistentConfig(projectRoot, userDataDir);
   const effectiveConfig = loadEffectiveConfig(configPaths);
 

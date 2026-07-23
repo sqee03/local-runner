@@ -9,7 +9,7 @@
     "dev": "vite",
     "build": "npm run typecheck && vite build",
     "preview": "vite preview",
-    "runner": "npm run build && npm run build:node && node .tmp/node-runtime/scripts/mvp-orchestrator.js",
+    "runner": "npm run build && npm run build:node && node .tmp/node-runtime/scripts/orchestrator.js",
     "package:windows": "npm run package:windows:bundle",
     "package:windows:prepare": "npm run build && npm run build:node && node .tmp/node-runtime/scripts/build-windows-icon.js && node .tmp/node-runtime/scripts/prepare-release-dir.js windows && node .tmp/node-runtime/scripts/ensure-vendored-node-runtime.js windows && node .tmp/node-runtime/scripts/ensure-vendored-deno-runtime.js windows && node .tmp/node-runtime/scripts/prepare-packaged-runtime.js && node .tmp/node-runtime/scripts/create-deno-payload.js windows",
     "package:windows:bundle": "npm run package:windows:prepare && node .tmp/node-runtime/scripts/run-deno-task.js compile:windows:bundle windows && node .tmp/node-runtime/scripts/finalize-windows-desktop-app.js && node .tmp/node-runtime/scripts/finalize-release-dir.js",

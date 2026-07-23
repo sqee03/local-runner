@@ -5,7 +5,7 @@
 The project has two shells around the same Node service orchestrator:
 
 - `npm run runner` builds the TypeScript runtime into `.tmp/node-runtime/`,
-  starts `.tmp/node-runtime/scripts/mvp-orchestrator.js`, and opens the runner
+  starts `.tmp/node-runtime/scripts/orchestrator.js`, and opens the runner
   UI in a browser.
 - A packaged app starts `desktop/main.ts` as a Deno desktop shell. The shell
   extracts its embedded payload, starts the same orchestrator with the bundled
@@ -15,7 +15,7 @@ The orchestrator owns four localhost-only components:
 
 | Component | Source | Responsibility |
 | --- | --- | --- |
-| Runner | `scripts/mvp-orchestrator.ts` | Serves the control UI and runtime/config APIs |
+| Runner | `scripts/orchestrator.ts` | Serves the control UI and runtime/config APIs |
 | Frontend | `injections/fe/` | Serves the injected simulator frontend |
 | Backend | `injections/be/` | Publishes test data to MQTT |
 | MQTT | `injections/mqtt/` | Provides TCP and WebSocket MQTT endpoints |
@@ -31,7 +31,7 @@ desktop routes `/desktop/simulator` and `/desktop/config`.
 3. It copies the shipped defaults to the persistent config directory and reads
    user overrides.
 4. It starts the bundled Node runtime against the generated
-   `scripts/mvp-orchestrator.js` payload bundle, or
+   `scripts/orchestrator.js` payload bundle, or
    attaches to an already-running runner on the configured port.
 5. It waits for the runner API, starts services for a normal app launch, and
    navigates the desktop window to the appropriate route.

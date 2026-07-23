@@ -11,7 +11,7 @@ const projectRoot = resolveProjectRoot(__dirname);
 const stagingRoot = path.join(projectRoot, ".tmp", "packaged-runtime");
 
 const nodeBundles: ReadonlyArray<readonly [string, string]> = [
-  ["scripts/mvp-orchestrator.ts", "scripts/mvp-orchestrator.js"],
+  ["scripts/orchestrator.ts", "scripts/orchestrator.js"],
   ["injections/fe/server.ts", "injections/fe/server.js"],
   ["injections/be/server.ts", "injections/be/server.js"],
   ["injections/mqtt/server.ts", "injections/mqtt/server.js"]

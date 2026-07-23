@@ -16,6 +16,38 @@ already cached. The npm packaging commands do not require a global Deno
 installation; a global Deno installation is required to invoke any `deno task`
 command.
 
+## Tech Stack
+
+The runner is a TypeScript-first local desktop/runtime wrapper:
+
+| Area | Technology | Role |
+| --- | --- | --- |
+| Runner UI | React 19, React DOM, Vite | Browser-based control UI for config and runtime state |
+| Source language | TypeScript | Strictly typed UI, Node runtime scripts, injected services, and packaging scripts |
+| Runtime orchestration | Node.js | Serves the runner API/UI and starts/stops the injected local packages |
+| Desktop shell | Deno Desktop | Native desktop window, tray menu, payload extraction, and packaged app launcher |
+| Bundling | Vite, esbuild | Builds the React UI and bundles/minifies Node/injected runtime entries for packaging |
+| Config storage | JSON files | Shipped defaults plus local user overrides |
+| Icon/package utilities | `pe-library`, `resedit`, platform tools | Windows icon resource embedding, macOS icon/app/dmg finalization |
+
+## Mocked/demo pieces
+
+The app currently ships a mocked injected runtime to prove the packaging and
+orchestration flow. These pieces are examples, not final product integrations:
+
+| Mock/demo part | Files | Dependencies used for the mock |
+| --- | --- | --- |
+| Local MQTT broker | `injections/mqtt/server.ts` | `aedes`, `websocket-stream` |
+| Backend publisher | `injections/be/server.ts` | `mqtt` |
+| Injected frontend placeholder | `injections/fe/server.ts`, `injections/fe/app.ts`, `injections/fe/index.html` | no framework dependency; plain HTML/CSS/TS |
+
+`aedes` is only there to provide an embedded MQTT broker for the local example.
+`websocket-stream` exposes that broker over WebSocket for the demo frontend.
+`mqtt` is used by the mocked backend publisher to send heartbeat/test messages.
+The `ws` package is listed as a runtime dependency but is not directly imported
+by the current source; it should be reviewed when the mocked MQTT example is
+replaced or hardened.
+
 ## Development
 
 Install dependencies and start the complete local runtime:
