@@ -99,6 +99,22 @@ same `simulator-data` directory: `launcher.log`, `orchestrator.log`, `fe.log`,
 Local development writes the same set (except `launcher.log`) under the project
 `logs/` directory.
 
+## Versioning
+
+The simulator app version comes from the root `package.json` only. The React UI,
+desktop launcher, and packaged runtime all read that root package metadata.
+
+Bump the app version without creating a git commit or git tag:
+
+```bash
+npm version 0.1.1 --no-git-tag-version
+```
+
+Injected mock apps under `injections/*` are workspace packages, but they
+intentionally do not carry simulator app version metadata. If an injected app
+becomes independently released later, version it from that app's own project
+workflow.
+
 ## Packaging
 
 Build the Windows x64 app directory:

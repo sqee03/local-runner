@@ -108,7 +108,6 @@ async function main(): Promise<void> {
 
   copyDirectory("config");
   copyDirectory("dist");
-  copyFile("version.json");
   const packageMetadata = readPackageMetadata();
   fs.writeFileSync(
     resolveStaged("package.json"),

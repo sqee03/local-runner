@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import appVersionInfo from "../version.json";
+import packageMetadata from "../package.json";
 import {
   type ConfigFieldType,
   type JsonObject,
@@ -71,7 +71,7 @@ function resolveDocumentTitle(page: Page, appVersion: string): string {
 }
 
 function App() {
-  const appVersion = appVersionInfo.version;
+  const appVersion = packageMetadata.version;
   const frontendWindowRef = useRef<Window | null>(null);
   const [page, setPage] = useState(() => resolvePage(window.location.pathname));
   const [configData, setConfigData] = useState<ConfigResponse | null>(null);

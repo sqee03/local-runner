@@ -113,8 +113,8 @@ type RuntimeStatus = {
   isTransitioning?: boolean;
 };
 
-type AppVersionInfo = {
-  version: string;
+type PackageMetadata = {
+  readonly version?: string;
 };
 
 const desktopDeno = Deno as DesktopDeno;
@@ -605,17 +605,17 @@ function resolveDesktopUrl(runnerUrl: string, view: DesktopView) {
 }
 
 function loadAppVersion(projectRoot: string) {
-  const versionPath = path.join(projectRoot, "version.json");
+  const packagePath = path.join(projectRoot, "package.json");
 
-  if (!fs.existsSync(versionPath)) {
-    throw new Error(`App version file is missing at ${versionPath}`);
+  if (!fs.existsSync(packagePath)) {
+    throw new Error(`Package metadata file is missing at ${packagePath}`);
   }
 
-  const versionInfo = JSON.parse(fs.readFileSync(versionPath, "utf8")) as AppVersionInfo;
-  const version = versionInfo.version?.trim();
+  const packageMetadata = JSON.parse(fs.readFileSync(packagePath, "utf8")) as PackageMetadata;
+  const version = packageMetadata.version?.trim();
 
   if (!version) {
-    throw new Error(`App version is missing in ${versionPath}`);
+    throw new Error(`App version is missing in ${packagePath}`);
   }
 
   return version;

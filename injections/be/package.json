@@ -1,6 +1,5 @@
 {
   "name": "@local-mqtt-app-simulator/injection-be",
-  "version": "0.1.0",
   "private": true,
   "type": "module",
   "dependencies": {

@@ -85,10 +85,6 @@ const baseSources: ReadonlyArray<PayloadSource> = [
     target: "package.json"
   },
   {
-    source: path.relative(projectRoot, path.join(packagedRuntimeSource, "version.json")),
-    target: "version.json"
-  },
-  {
     source: path.relative(projectRoot, path.join(packagedRuntimeSource, "scripts")),
     target: "scripts"
   }
