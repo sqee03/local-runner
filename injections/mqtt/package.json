@@ -1,0 +1,10 @@
+{
+  "name": "@local-mqtt-app-runner/injection-mqtt",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "aedes": "^0.51.3",
+    "websocket-stream": "^5.5.2"
+  }
+}

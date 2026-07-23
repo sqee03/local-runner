@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "injections/*"
+  ],
   "scripts": {
     "build:node": "tsc --project tsconfig.node.json && node .tmp/node-runtime/scripts/copy-runtime-assets.js",
     "typecheck": "tsc --project tsconfig.json --noEmit && tsc --project tsconfig.node.json --noEmit",
@@ -21,12 +24,8 @@
     "package:mac:arm:installer": "npm run package:mac:arm:prepare && node .tmp/node-runtime/scripts/run-deno-task.js compile:mac:arm:installer mac-arm64 && node .tmp/node-runtime/scripts/finalize-macos-desktop-app.js --dmg && node .tmp/node-runtime/scripts/finalize-release-dir.js"
   },
   "dependencies": {
-    "aedes": "^0.51.3",
-    "mqtt": "^5.10.4",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "websocket-stream": "^5.5.2",
-    "ws": "^8.18.0"
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
