@@ -4,6 +4,7 @@ release/
 .tmp/
 desktop/bin/
 logs/
+coverage/
 vendor/
 .DS_Store
 .agents

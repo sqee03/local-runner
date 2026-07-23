@@ -15,12 +15,19 @@ import {
   type JsonObject,
   type PackageDefinition,
   type PackageName,
-  type PackageRuntimeConfig,
   type PackageStatus,
   type RuntimeState,
   errorMessage,
   isJsonObject
 } from "./node-types.js";
+import {
+  applyRuntimePortOverrides as applyRuntimePortOverridesWithOptions,
+  buildPackageRuntimeConfig as buildPackageRuntimeConfigWithOptions,
+  contentTypeFor,
+  normalizeConfigForClient as normalizeConfigSnapshotForClient,
+  normalizeRuntimeForClient as normalizeRuntimeStateForClient,
+  resolveStaticAssetPath
+} from "./orchestrator-helpers.js";
 import { resolveProjectRoot } from "./runtime-paths.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -50,8 +57,6 @@ const packagePortOverrides: PackagePortOverrides = {
   mqttTcp: Number.parseInt(process.env.PACKAGE_RUNNER_MQTT_TCP_PORT_OVERRIDE ?? "", 10),
   mqttWs: Number.parseInt(process.env.PACKAGE_RUNNER_MQTT_WS_PORT_OVERRIDE ?? "", 10)
 };
-
-fs.mkdirSync(logDir, { recursive: true });
 
 const nativeConsole = {
   info: console.log.bind(console),
@@ -89,6 +94,7 @@ function appendLogLine(
   const message = values.map(formatLogValue).join(" ");
 
   try {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.appendFileSync(
       filePath,
       `[${new Date().toISOString()}] [${level.toUpperCase()}] ${message}\n`,
@@ -113,8 +119,6 @@ const logger: Logger = {
     nativeConsole.error(...values);
   }
 };
-
-logger.info(`Orchestrator process started (pid=${process.pid}).`);
 
 function attachPackageOutput(packageName: PackageName, childProcess: ChildProcess): void {
   const logPath = path.join(logDir, `${packageName}.log`);
@@ -169,36 +173,12 @@ const runtimeState: RuntimeState = {
 };
 
 function applyRuntimePortOverrides(configSnapshot: ConfigSnapshot): ConfigSnapshot {
-  return {
-    ...configSnapshot,
-    effective: {
-      ...configSnapshot.effective,
-      ports: {
-        ...configSnapshot.effective.ports,
-        runner: Number.isFinite(runnerPortOverride)
-          ? runnerPortOverride
-          : configSnapshot.effective.ports.runner,
-        frontendPackage: Number.isFinite(packagePortOverrides.frontendPackage)
-          ? packagePortOverrides.frontendPackage
-          : configSnapshot.effective.ports.frontendPackage,
-        mqttTcp: Number.isFinite(packagePortOverrides.mqttTcp)
-          ? packagePortOverrides.mqttTcp
-          : configSnapshot.effective.ports.mqttTcp,
-        mqttWs: Number.isFinite(packagePortOverrides.mqttWs)
-          ? packagePortOverrides.mqttWs
-          : configSnapshot.effective.ports.mqttWs
-      }
-    }
-  };
-}
-
-function contentTypeFor(filePath: string): string {
-  if (filePath.endsWith(".html")) return "text/html; charset=utf-8";
-  if (filePath.endsWith(".js")) return "text/javascript; charset=utf-8";
-  if (filePath.endsWith(".css")) return "text/css; charset=utf-8";
-  if (filePath.endsWith(".json")) return "application/json; charset=utf-8";
-  if (filePath.endsWith(".svg")) return "image/svg+xml";
-  return "application/octet-stream";
+  return applyRuntimePortOverridesWithOptions(configSnapshot, {
+    runner: runnerPortOverride,
+    frontendPackage: packagePortOverrides.frontendPackage,
+    mqttTcp: packagePortOverrides.mqttTcp,
+    mqttWs: packagePortOverrides.mqttWs
+  });
 }
 
 function parseJsonBody(req: IncomingMessage): Promise<unknown> {
@@ -227,25 +207,14 @@ function sendJson(res: ServerResponse, statusCode: number, payload: unknown): vo
 }
 
 function normalizeConfigForClient(configSnapshot: ConfigSnapshot): ClientConfigSnapshot {
-  return {
-    defaults: configSnapshot.defaults,
-    userOverrides: configSnapshot.userOverrides,
-    effective: configSnapshot.effective,
-    filePaths: {
+  return normalizeConfigSnapshotForClient(configSnapshot, {
       defaultConfig: configStore.defaultConfigPath,
       userConfig: configStore.userConfigPath
-    }
-  };
+  });
 }
 
 function normalizeRuntimeForClient(): ClientRuntimeState {
-  return {
-    isRunning: runtimeState.isRunning,
-    isTransitioning: runtimeState.isTransitioning,
-    lastError: runtimeState.lastError,
-    currentConfig: runtimeState.currentConfig,
-    packageStatus: runtimeState.packageStatus
-  };
+  return normalizeRuntimeStateForClient(runtimeState);
 }
 
 function openBrowser(url: string): void {
@@ -376,68 +345,14 @@ async function resolveRuntimePorts(
   return ports;
 }
 
-function buildPackageRuntimeConfig(configSnapshot: ConfigSnapshot): PackageRuntimeConfig {
-  const effective = configSnapshot.effective;
-  const host = effective.interfaces.host;
-  const ports = effective.ports;
-  const resolveRuntimeEntry = (entryPath: string): string => {
-    const projectEntryPath = path.resolve(projectRoot, entryPath);
-    if (fs.existsSync(projectEntryPath)) {
-      return projectEntryPath;
-    }
-
-    return path.resolve(runtimeRoot, entryPath);
-  };
-
-  return {
-    host,
-    ports,
-    mqttTopic: effective.mqtt.testTopic,
-    packageDefinitions: {
-      mqtt: {
-        executable:
-          effective.paths.mqttExecutable === "node"
-            ? process.execPath
-            : effective.paths.mqttExecutable,
-        entry: resolveRuntimeEntry(effective.paths.mqttEntry),
-        cwd: path.resolve(projectRoot, effective.paths.mqttWorkingDirectory),
-        env: {
-          ...process.env,
-          MQTT_HOST: host,
-          MQTT_TCP_PORT: String(ports.mqttTcp),
-          MQTT_WS_PORT: String(ports.mqttWs)
-        }
-      },
-      be: {
-        executable:
-          effective.paths.backendExecutable === "node"
-            ? process.execPath
-            : effective.paths.backendExecutable,
-        entry: resolveRuntimeEntry(effective.paths.backendEntry),
-        cwd: path.resolve(projectRoot, effective.paths.backendWorkingDirectory),
-        env: {
-          ...process.env,
-          MQTT_TCP_URL: `mqtt://${host}:${ports.mqttTcp}`,
-          MQTT_TEST_TOPIC: effective.mqtt.testTopic
-        }
-      },
-      fe: {
-        executable:
-          effective.paths.frontendExecutable === "node"
-            ? process.execPath
-            : effective.paths.frontendExecutable,
-        entry: resolveRuntimeEntry(effective.paths.frontendEntry),
-        cwd: path.resolve(projectRoot, effective.paths.frontendWorkingDirectory),
-        env: {
-          ...process.env,
-          FE_HOST: host,
-          FE_PORT: String(ports.frontendPackage),
-          MQTT_WS_PORT: String(ports.mqttWs),
-          MQTT_TEST_TOPIC: effective.mqtt.testTopic
-        }
-      }
-    }
-  };
+function buildPackageRuntimeConfig(configSnapshot: ConfigSnapshot) {
+  return buildPackageRuntimeConfigWithOptions(configSnapshot, {
+    projectRoot,
+    runtimeRoot,
+    nodeExecutable: process.execPath,
+    environment: process.env,
+    entryExists: fs.existsSync
+  });
 }
 
 function attachPackageExitHandler(packageName: PackageName, childProcess: ChildProcess): void {
@@ -641,13 +556,12 @@ function createStaticServer(): http.Server {
       return;
     }
 
-    const requestPath = rawPath === "/" ? "/index.html" : rawPath;
-    const safePath = path.normalize(requestPath).replace(/^(\.\.[/\\])+/, "");
-    let filePath = path.join(distDir, safePath);
-
-    if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-      filePath = path.join(distDir, "index.html");
-    }
+    const filePath = resolveStaticAssetPath({
+      distDir,
+      rawPath,
+      exists: fs.existsSync,
+      isDirectory: (absolutePath) => fs.statSync(absolutePath).isDirectory()
+    });
 
     fs.readFile(filePath, (error, data) => {
       if (error) {
@@ -663,6 +577,8 @@ function createStaticServer(): http.Server {
 }
 
 async function main(): Promise<void> {
+  logger.info(`Orchestrator process started (pid=${process.pid}).`);
+
   if (!fs.existsSync(distDir)) {
     throw new Error("Missing dist folder. Run the build first.");
   }
@@ -721,7 +637,9 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  logger.error(error);
-  process.exit(1);
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  main().catch((error) => {
+    logger.error(error);
+    process.exit(1);
+  });
+}

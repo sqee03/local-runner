@@ -21,18 +21,15 @@ function resolve(relativePath: string): string {
   return path.join(projectRoot, relativePath);
 }
 
-function resolveStaged(relativePath: string): string {
+export function resolveStaged(relativePath: string): string {
   return path.join(stagingRoot, relativePath);
 }
 
+/* v8 ignore start */
 function copyDirectory(relativePath: string): void {
   fs.cpSync(resolve(relativePath), resolveStaged(relativePath), {
     recursive: true
   });
-}
-
-function copyFile(relativePath: string): void {
-  fs.copyFileSync(resolve(relativePath), resolveStaged(relativePath));
 }
 
 async function bundleNodeEntry(sourcePath: string, outputPath: string): Promise<void> {
@@ -51,9 +48,12 @@ async function bundleNodeEntry(sourcePath: string, outputPath: string): Promise<
     }
   });
 }
+/* v8 ignore stop */
 
-function readPackageMetadata(): { readonly name: string; readonly version: string } {
-  const parsed: unknown = JSON.parse(fs.readFileSync(resolve("package.json"), "utf8"));
+export function readPackageMetadata(
+  packageJsonPath = resolve("package.json")
+): { readonly name: string; readonly version: string } {
+  const parsed: unknown = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
   if (
     !isJsonObject(parsed) ||
     typeof parsed.name !== "string" ||
@@ -68,6 +68,7 @@ function readPackageMetadata(): { readonly name: string; readonly version: strin
   };
 }
 
+/* v8 ignore start */
 async function bundleFrontendAssets(): Promise<void> {
   const frontendDir = resolveStaged("injections/fe");
   fs.mkdirSync(frontendDir, { recursive: true });
@@ -130,7 +131,10 @@ async function main(): Promise<void> {
   console.log(`Prepared bundled runtime at ${stagingRoot}`);
 }
 
-main().catch((error) => {
-  console.error(errorMessage(error));
-  process.exit(1);
-});
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  main().catch((error) => {
+    console.error(errorMessage(error));
+    process.exit(1);
+  });
+}
+/* v8 ignore stop */

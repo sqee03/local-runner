@@ -13,22 +13,32 @@ const packagedRuntimeSource = path.join(projectRoot, ".tmp", "packaged-runtime")
 
 const target = process.argv[2];
 
-interface PayloadSource {
+export interface PayloadSource {
   readonly source: string;
   readonly target: string;
 }
 
-interface PayloadFile {
+export interface PayloadFile {
   readonly path: string;
   readonly mode: number;
   readonly base64: string;
 }
 
-interface PayloadManifest {
+export interface PayloadManifest {
   readonly version: 1;
   readonly target: ReleaseTarget;
   readonly hash: string;
   readonly files: ReadonlyArray<PayloadFile>;
+}
+
+export interface PayloadManifestOptions {
+  readonly projectRoot: string;
+  readonly packagedRuntimeSource: string;
+  readonly target: ReleaseTarget;
+  readonly baseSources?: ReadonlyArray<PayloadSource>;
+  readonly runtimeSources?: Partial<Record<ReleaseTarget, ReadonlyArray<PayloadSource>>>;
+  readonly targetSources?: Partial<Record<ReleaseTarget, ReadonlyArray<PayloadSource>>>;
+  readonly requiredRuntimeFiles?: Partial<Record<ReleaseTarget, ReadonlyArray<string>>>;
 }
 
 const runtimeSources: Record<ReleaseTarget, ReadonlyArray<PayloadSource>> = {
@@ -63,9 +73,13 @@ const requiredRuntimeFiles: Record<ReleaseTarget, ReadonlyArray<string>> = {
   "mac-arm64": [".tmp/build-tools/macos-arm64-node/bin/node"]
 };
 
-const baseSources: ReadonlyArray<PayloadSource> = [
+export function createBaseSources(
+  rootPath: string,
+  runtimeSourcePath: string
+): ReadonlyArray<PayloadSource> {
+  return [
   {
-    source: path.relative(projectRoot, path.join(packagedRuntimeSource, "config")),
+    source: path.relative(rootPath, path.join(runtimeSourcePath, "config")),
     target: "config"
   },
   {
@@ -73,45 +87,48 @@ const baseSources: ReadonlyArray<PayloadSource> = [
     target: "desktop/assets"
   },
   {
-    source: path.relative(projectRoot, path.join(packagedRuntimeSource, "dist")),
+    source: path.relative(rootPath, path.join(runtimeSourcePath, "dist")),
     target: "dist"
   },
   {
-    source: path.relative(projectRoot, path.join(packagedRuntimeSource, "injections")),
+    source: path.relative(rootPath, path.join(runtimeSourcePath, "injections")),
     target: "injections"
   },
   {
-    source: path.relative(projectRoot, path.join(packagedRuntimeSource, "package.json")),
+    source: path.relative(rootPath, path.join(runtimeSourcePath, "package.json")),
     target: "package.json"
   },
   {
-    source: path.relative(projectRoot, path.join(packagedRuntimeSource, "scripts")),
+    source: path.relative(rootPath, path.join(runtimeSourcePath, "scripts")),
     target: "scripts"
   }
-];
+  ];
+}
 
-function ensureExists(relativePath: string): void {
-  const absolutePath = path.join(projectRoot, relativePath);
+export function ensurePayloadSourceExists(rootPath: string, relativePath: string): void {
+  const absolutePath = path.join(rootPath, relativePath);
   if (!fs.existsSync(absolutePath)) {
     throw new Error(`Missing payload source: ${absolutePath}`);
   }
 }
 
-function readMode(absolutePath: string): number {
+export function readPayloadFileMode(absolutePath: string): number {
   return fs.statSync(absolutePath).mode & 0o777;
 }
 
-function collectFiles(
+export function collectPayloadFiles(
+  rootPath: string,
   sourceRelativePath: string,
   targetRelativePath: string,
   entries: PayloadFile[]
 ): void {
-  const absolutePath = path.join(projectRoot, sourceRelativePath);
+  const absolutePath = path.join(rootPath, sourceRelativePath);
   const stats = fs.statSync(absolutePath);
 
   if (stats.isDirectory()) {
     for (const childName of fs.readdirSync(absolutePath)) {
-      collectFiles(
+      collectPayloadFiles(
+        rootPath,
         path.join(sourceRelativePath, childName),
         path.join(targetRelativePath, childName),
         entries
@@ -123,34 +140,30 @@ function collectFiles(
   const content = fs.readFileSync(absolutePath);
   entries.push({
     path: targetRelativePath.split(path.sep).join("/"),
-    mode: readMode(absolutePath),
+    mode: readPayloadFileMode(absolutePath),
     base64: content.toString("base64")
   });
 }
 
-function isReleaseTarget(value: string | undefined): value is ReleaseTarget {
-  return value === "windows" || value === "mac-arm64";
-}
-
-function buildPayloadManifest(): PayloadManifest {
-  if (!isReleaseTarget(target)) {
-    throw new Error(`Unsupported payload target "${target}". Use "windows" or "mac-arm64".`);
-  }
-
-  const sourcePaths = [...baseSources, ...runtimeSources[target], ...targetSources[target]];
-  const requiredFiles = requiredRuntimeFiles[target];
+export function buildPayloadManifest(options: PayloadManifestOptions): PayloadManifest {
+  const sourcePaths = [
+    ...(options.baseSources ?? createBaseSources(options.projectRoot, options.packagedRuntimeSource)),
+    ...(options.runtimeSources?.[options.target] ?? runtimeSources[options.target]),
+    ...(options.targetSources?.[options.target] ?? targetSources[options.target])
+  ];
+  const requiredFiles = options.requiredRuntimeFiles?.[options.target] ?? requiredRuntimeFiles[options.target];
 
   for (const sourcePath of sourcePaths) {
-    ensureExists(sourcePath.source);
+    ensurePayloadSourceExists(options.projectRoot, sourcePath.source);
   }
 
   for (const requiredFile of requiredFiles) {
-    ensureExists(requiredFile);
+    ensurePayloadSourceExists(options.projectRoot, requiredFile);
   }
 
   const files: PayloadFile[] = [];
   for (const sourcePath of sourcePaths) {
-    collectFiles(sourcePath.source, sourcePath.target, files);
+    collectPayloadFiles(options.projectRoot, sourcePath.source, sourcePath.target, files);
   }
 
   files.sort((left, right) => left.path.localeCompare(right.path));
@@ -171,22 +184,34 @@ function buildPayloadManifest(): PayloadManifest {
 
   return {
     version: 1,
-    target,
+    target: options.target,
     hash,
     files
   };
 }
 
+/* v8 ignore start */
 function main(): void {
-  const payload = buildPayloadManifest();
+  if (target !== "windows" && target !== "mac-arm64") {
+    throw new Error(`Unsupported payload target "${target}". Use "windows" or "mac-arm64".`);
+  }
+
+  const payload = buildPayloadManifest({
+    projectRoot,
+    packagedRuntimeSource,
+    target
+  });
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(`${outputPath}`, `${JSON.stringify(payload)}\n`, "utf8");
   console.log(`Wrote payload manifest for ${target} to ${outputPath}`);
 }
 
-try {
-  main();
-} catch (error) {
-  console.error(errorMessage(error));
-  process.exit(1);
+if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  try {
+    main();
+  } catch (error) {
+    console.error(errorMessage(error));
+    process.exit(1);
+  }
 }
+/* v8 ignore stop */

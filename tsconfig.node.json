@@ -15,5 +15,5 @@
     "types": ["node"]
   },
   "include": ["scripts/**/*.ts", "injections/**/*.ts"],
-  "exclude": ["injections/fe/app.ts"]
+  "exclude": ["injections/fe/app.ts", "**/*.spec.ts", "**/*.spec-helper.ts"]
 }

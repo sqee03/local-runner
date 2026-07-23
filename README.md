@@ -78,6 +78,24 @@ The default local endpoints are:
 Use `npm run dev` when only the Vite UI is needed. `npm run build` creates the
 web assets in `dist/`.
 
+## Unit Tests
+
+Unit tests use Vitest and live next to the source file they cover using the
+`*.spec.ts` suffix. They cover root simulator scripts and wrapper helpers; the
+mocked injected projects are excluded from unit test discovery.
+
+Run the test suite:
+
+```bash
+npm run test
+```
+
+Run tests with coverage:
+
+```bash
+npm run test:coverage
+```
+
 ## Configuration
 
 Shipped defaults live in `config/defaults.json`; development overrides live in
