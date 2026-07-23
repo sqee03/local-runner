@@ -118,8 +118,8 @@ type AppVersionInfo = {
 };
 
 const desktopDeno = Deno as DesktopDeno;
-const appName = "runner";
-const launchMode = Deno.args.includes("--runner") ? "runner" : "app";
+const appName = "simulator";
+const launchMode = Deno.args.includes("--config") ? "config" : "app";
 const executableDir = path.dirname(Deno.execPath());
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const bundledPayloadPath = path.join(moduleDir, "..", ".tmp", "payload-manifest.json");
@@ -443,7 +443,7 @@ function findAvailableRunnerPort(host: string, preferredPort: number) {
   }
 
   throw new Error(
-    `Runner port ${preferredPort} is unavailable and no fallback port was found nearby.`
+    `Simulator port ${preferredPort} is unavailable and no fallback port was found nearby.`
   );
 }
 
@@ -586,7 +586,7 @@ function createBootstrapServer() {
   <body>
     <section class="card">
       <p class="eyebrow">Desktop launch</p>
-      <h1>Preparing runner</h1>
+      <h1>Preparing simulator</h1>
       <p>Starting the local runtime and loading the app window.</p>
     </section>
   </body>
@@ -778,7 +778,7 @@ function createMainWindow(appVersion: string) {
   }
 
   activeDesktopWindow = new desktopDeno.BrowserWindow({
-    title: resolveWindowTitle(launchMode === "runner" ? "config" : "simulator", appVersion),
+    title: resolveWindowTitle(launchMode === "config" ? "config" : "simulator", appVersion),
     width: desktopWindowDefaults.width,
     height: desktopWindowDefaults.height,
     transparentTitlebar: true
@@ -853,7 +853,7 @@ async function launchOrAttachRunner(
 
   if (portOverrides.runner !== configuredUrls.runnerPort) {
     const message =
-      `Runner port ${configuredUrls.runnerPort} is busy. Falling back to ${portOverrides.runner}.`;
+      `Simulator port ${configuredUrls.runnerPort} is busy. Falling back to ${portOverrides.runner}.`;
     console.warn(message);
     writeDiagnosticLog(message);
   }
@@ -898,7 +898,7 @@ async function setupDesktopShell(
   }
 
   let allowClose = false;
-  let currentView: DesktopView = launchMode === "runner" ? "config" : "simulator";
+  let currentView: DesktopView = launchMode === "config" ? "config" : "simulator";
 
   await applyWindowsWindowIcon(win, projectRoot, currentView, appVersion);
 
@@ -1043,7 +1043,7 @@ async function main() {
   }
 
   if (!fs.existsSync(runnerEntry)) {
-    throw new Error(`Runner entry is missing at ${runnerEntry}`);
+    throw new Error(`Simulator entry is missing at ${runnerEntry}`);
   }
 
   const bootstrapServer = shellMode === "desktop" ? createBootstrapServer() : null;
@@ -1055,7 +1055,7 @@ async function main() {
     effectiveConfig,
     shellMode
   );
-  writeDiagnosticLog(`Runner launch context ready. attached=${launchContext.attachedToExistingRunner}`);
+  writeDiagnosticLog(`Simulator launch context ready. attached=${launchContext.attachedToExistingRunner}`);
 
   let shuttingDown = false;
 
@@ -1094,7 +1094,7 @@ async function main() {
   if (launchContext.child) {
     launchContext.child.status.then((status) => {
       if (!shuttingDown) {
-        const message = `runner runtime exited with code ${status.code}.`;
+        const message = `simulator runtime exited with code ${status.code}.`;
         console.error(message);
         writeDiagnosticLog(message);
         shutdown(status.code).catch(() => {
@@ -1120,10 +1120,10 @@ async function main() {
 
   const runtimeReady = await waitForUrl(`${launchContext.runnerUrl}/api/runtime`, 20000);
   if (!runtimeReady) {
-    throw new Error(`Runner did not become ready at ${launchContext.runnerUrl}.`);
+    throw new Error(`Simulator did not become ready at ${launchContext.runnerUrl}.`);
   }
 
-  if (launchMode === "runner") {
+  if (launchMode === "config") {
     openBrowser(launchContext.runnerUrl);
   } else {
     await ensureRuntimeStarted(launchContext.runnerUrl).catch(() => {});

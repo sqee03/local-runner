@@ -150,7 +150,7 @@ function App() {
   }, []);
 
   function tryOpenFrontend(url: string): Window | null {
-    const openedWindow = window.open(url, "package-runner-fe");
+    const openedWindow = window.open(url, "package-simulator-fe");
     frontendWindowRef.current = openedWindow;
     return openedWindow;
   }
@@ -277,7 +277,7 @@ function App() {
 
   function renderRuntimeStatusText() {
     if (runtimeState.lastError) {
-      return `Runner error: ${runtimeState.lastError}`;
+      return `Simulator error: ${runtimeState.lastError}`;
     }
 
     if (runtimeState.isTransitioning) {
@@ -288,7 +288,7 @@ function App() {
 
     return runtimeState.isRunning
       ? "Injected FE, BE, and MQTT packages are active."
-      : "Runner is ready. Start the runtime to load the Simulator.";
+      : "Simulator is ready. Start the runtime to load the injected app.";
   }
 
   function renderConfigForm() {
@@ -297,7 +297,7 @@ function App() {
 
     return (
       <section className={isDesktopShell ? "config-card desktop-surface" : "config-card"}>
-        <p className="eyebrow">Runner Settings</p>
+        <p className="eyebrow">Simulator Settings</p>
         <div className="title-row">
           <h1>Config</h1>
           <span className="version-badge">v{appVersion}</span>
@@ -410,7 +410,7 @@ function App() {
             className="desktop-app-frame"
             key={frontendUrl}
             src={frontendUrl}
-            title="PackageRunner Simulator"
+            title="Package Simulator"
           />
         </section>
       );
@@ -461,20 +461,20 @@ function App() {
 
       {!isConfigPage ? (
         <section className="hero-card">
-          <p className="eyebrow">Runner control tool</p>
+          <p className="eyebrow">Simulator control tool</p>
           <div className="title-row">
-            <h1>Package Runner</h1>
+            <h1>Package Simulator</h1>
             <span className="version-badge">v{appVersion}</span>
           </div>
           <p className="lede">
-            This runner controls separate FE, BE, and MQTT packages. The frontend
+            This simulator controls separate FE, BE, and MQTT packages. The frontend
             package launches on its own port as an injected application.
           </p>
 
-          <div className="runner-actions">
-            <div className="runner-action-row">
+          <div className="simulator-actions">
+            <div className="simulator-action-row">
               <button
-                className={runtimeState.isRunning ? "runner-button stop" : "runner-button start"}
+                className={runtimeState.isRunning ? "simulator-button stop" : "simulator-button start"}
                 type="button"
                 onClick={toggleRuntime}
                 disabled={runtimeState.isTransitioning}
@@ -512,7 +512,7 @@ function App() {
                 </div>
               ) : null}
             </div>
-            <p className="runner-hint">{renderRuntimeStatusText()}</p>
+            <p className="simulator-hint">{renderRuntimeStatusText()}</p>
           </div>
 
           <div className="status-grid">

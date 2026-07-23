@@ -9,9 +9,9 @@ import { errorMessage } from "./node-types.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = resolveProjectRoot(__dirname);
-const sourceAppPath = "/tmp/runner.app";
-const destinationAppPath = path.join(projectRoot, "release", "mac", "runner.app");
-const destinationDmgPath = path.join(projectRoot, "release", "mac", "runner.dmg");
+const sourceAppPath = "/tmp/simulator.app";
+const destinationAppPath = path.join(projectRoot, "release", "mac", "simulator.app");
+const destinationDmgPath = path.join(projectRoot, "release", "mac", "simulator.dmg");
 const createDmg = process.argv.includes("--dmg");
 
 function runCommand(
@@ -41,17 +41,17 @@ function signApp(targetPath: string): void {
 }
 
 function createDiskImage(appPath: string): void {
-  const stagingDir = fs.mkdtempSync(path.join(os.tmpdir(), "runner-dmg-"));
+  const stagingDir = fs.mkdtempSync(path.join(os.tmpdir(), "simulator-dmg-"));
 
   try {
-    fs.cpSync(appPath, path.join(stagingDir, "runner.app"), { recursive: true });
+    fs.cpSync(appPath, path.join(stagingDir, "simulator.app"), { recursive: true });
     fs.symlinkSync("/Applications", path.join(stagingDir, "Applications"));
     runCommand(
       "hdiutil",
       [
         "create",
         "-volname",
-        "runner",
+        "simulator",
         "-srcfolder",
         stagingDir,
         "-ov",

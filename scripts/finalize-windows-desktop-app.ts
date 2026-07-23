@@ -9,20 +9,20 @@ import * as ResEdit from "resedit";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = resolveProjectRoot(__dirname);
-const runnerPath = path.join(projectRoot, "release", "windows", "runner", "runner.exe");
+const simulatorPath = path.join(projectRoot, "release", "windows", "simulator", "simulator.exe");
 const iconPath = path.join(projectRoot, "desktop", "assets", "app-icon.ico");
-const temporaryRunnerPath = `${runnerPath}.with-icon`;
+const temporarySimulatorPath = `${simulatorPath}.with-icon`;
 
 function main(): void {
-  if (!fs.existsSync(runnerPath)) {
-    throw new Error(`Missing Windows runner executable at ${runnerPath}`);
+  if (!fs.existsSync(simulatorPath)) {
+    throw new Error(`Missing Windows simulator executable at ${simulatorPath}`);
   }
 
   if (!fs.existsSync(iconPath)) {
     throw new Error(`Missing Windows application icon at ${iconPath}`);
   }
 
-  const executable = PELibrary.NtExecutable.from(fs.readFileSync(runnerPath));
+  const executable = PELibrary.NtExecutable.from(fs.readFileSync(simulatorPath));
   const resources = PELibrary.NtExecutableResource.from(executable);
   const iconFile = ResEdit.Data.IconFile.from(fs.readFileSync(iconPath));
 
@@ -34,16 +34,16 @@ function main(): void {
   );
   resources.outputResource(executable);
 
-  fs.writeFileSync(temporaryRunnerPath, Buffer.from(executable.generate()));
-  fs.copyFileSync(temporaryRunnerPath, runnerPath);
-  fs.rmSync(temporaryRunnerPath, { force: true });
-  console.log(`Embedded ${iconFile.icons.length} icon sizes into ${runnerPath}`);
+  fs.writeFileSync(temporarySimulatorPath, Buffer.from(executable.generate()));
+  fs.copyFileSync(temporarySimulatorPath, simulatorPath);
+  fs.rmSync(temporarySimulatorPath, { force: true });
+  console.log(`Embedded ${iconFile.icons.length} icon sizes into ${simulatorPath}`);
 }
 
 try {
   main();
 } catch (error) {
-  fs.rmSync(temporaryRunnerPath, { force: true });
+  fs.rmSync(temporarySimulatorPath, { force: true });
   console.error(errorMessage(error));
   process.exit(1);
 }

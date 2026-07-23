@@ -185,7 +185,7 @@ function downloadFile(url: string, outputPath: string): Promise<void> {
       url,
       {
         headers: {
-          "User-Agent": "local-mqtt-app-runner/1.0"
+          "User-Agent": "local-mqtt-app-simulator/1.0"
         }
       },
       (response) => {

@@ -29,7 +29,7 @@ fs.rmSync(path.join(projectRoot, ".tmp", "windows-icon-backend"), {
 });
 
 if (removeWindowsBundle) {
-  fs.rmSync(path.join(projectRoot, "release", "windows", "runner"), {
+  fs.rmSync(path.join(projectRoot, "release", "windows", "simulator"), {
     recursive: true,
     force: true,
     maxRetries: 5,

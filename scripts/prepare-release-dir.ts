@@ -21,6 +21,10 @@ const legacyReleaseArtifacts = [
   path.join(releaseRoot, "runner.exe"),
   path.join(releaseRoot, "runner.dll"),
   path.join(releaseRoot, "runner.app"),
+  path.join(releaseRoot, "simulator"),
+  path.join(releaseRoot, "simulator.exe"),
+  path.join(releaseRoot, "simulator.dll"),
+  path.join(releaseRoot, "simulator.app"),
   path.join(releaseRoot, "windows-x64"),
   path.join(releaseRoot, "macos-arm64"),
   path.join(releaseRoot, ".DS_Store")

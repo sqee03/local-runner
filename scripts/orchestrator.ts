@@ -652,7 +652,7 @@ function createStaticServer(): http.Server {
     fs.readFile(filePath, (error, data) => {
       if (error) {
         res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
-        res.end("Failed to load runner assets.");
+        res.end("Failed to load simulator assets.");
         return;
       }
 
@@ -689,7 +689,7 @@ async function main(): Promise<void> {
   process.on("SIGTERM", shutdown);
 
   const runnerUrl = `http://${host}:${runnerPort}`;
-  logger.info(`Runner ready at ${runnerUrl}`);
+  logger.info(`Simulator ready at ${runnerUrl}`);
   logger.info(`Config defaults: ${configStore.defaultConfigPath}`);
   logger.info(`Config overrides: ${configStore.userConfigPath}`);
   logger.info(`Logs: ${logDir}`);

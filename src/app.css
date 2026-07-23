@@ -140,7 +140,7 @@ h1 {
   margin-top: 28px;
 }
 
-.runner-actions {
+.simulator-actions {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -148,14 +148,14 @@ h1 {
   margin-top: 28px;
 }
 
-.runner-action-row {
+.simulator-action-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 16px;
 }
 
-.runner-button {
+.simulator-button {
   min-width: 220px;
   border: 0;
   border-radius: 999px;
@@ -172,41 +172,41 @@ h1 {
   will-change: transform, box-shadow;
 }
 
-.runner-button.start {
+.simulator-button.start {
   background: linear-gradient(135deg, #9cf98a 0%, #46d46b 100%);
   box-shadow: 0 18px 34px rgba(70, 212, 107, 0.26);
 }
 
-.runner-button.stop {
+.simulator-button.stop {
   background: linear-gradient(135deg, #ff8e7f 0%, #f04141 100%);
   box-shadow: 0 18px 34px rgba(240, 65, 65, 0.24);
 }
 
-.runner-button:hover:not(:disabled) {
+.simulator-button:hover:not(:disabled) {
   transform: translateY(-2px);
   filter: saturate(1.04);
 }
 
-.runner-button.start:hover:not(:disabled) {
+.simulator-button.start:hover:not(:disabled) {
   box-shadow: 0 24px 42px rgba(70, 212, 107, 0.34);
 }
 
-.runner-button.stop:hover:not(:disabled) {
+.simulator-button.stop:hover:not(:disabled) {
   box-shadow: 0 24px 42px rgba(240, 65, 65, 0.32);
 }
 
-.runner-button:disabled {
+.simulator-button:disabled {
   cursor: wait;
   opacity: 0.82;
 }
 
-.runner-button.compact {
+.simulator-button.compact {
   min-width: 180px;
   padding: 14px 22px;
   font-size: 1rem;
 }
 
-.runner-hint {
+.simulator-hint {
   margin: 0;
   color: #d3dce4;
   line-height: 1.5;

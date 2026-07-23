@@ -4,18 +4,18 @@
 
 The project has two shells around the same Node service orchestrator:
 
-- `npm run runner` builds the TypeScript runtime into `.tmp/node-runtime/`,
-  starts `.tmp/node-runtime/scripts/orchestrator.js`, and opens the runner
+- `npm run simulator` builds the TypeScript runtime into `.tmp/node-runtime/`,
+  starts `.tmp/node-runtime/scripts/orchestrator.js`, and opens the simulator
   UI in a browser.
 - A packaged app starts `desktop/main.ts` as a Deno desktop shell. The shell
   extracts its embedded payload, starts the same orchestrator with the bundled
-  Node runtime, and presents the runner routes in a native window.
+  Node runtime, and presents the simulator routes in a native window.
 
 The orchestrator owns four localhost-only components:
 
 | Component | Source | Responsibility |
 | --- | --- | --- |
-| Runner | `scripts/orchestrator.ts` | Serves the control UI and runtime/config APIs |
+| Simulator | `scripts/orchestrator.ts` | Serves the control UI and runtime/config APIs |
 | Frontend | `injections/fe/` | Serves the injected simulator frontend |
 | Backend | `injections/be/` | Publishes test data to MQTT |
 | MQTT | `injections/mqtt/` | Provides TCP and WebSocket MQTT endpoints |
@@ -26,20 +26,20 @@ desktop routes `/desktop/simulator` and `/desktop/config`.
 ## Packaged Startup
 
 1. The Deno launcher reads the embedded `.tmp/payload-manifest.json`.
-2. It extracts the payload to `runner-data/runtime/<payload-hash>/`, reusing an
+2. It extracts the payload to `simulator-data/runtime/<payload-hash>/`, reusing an
    existing extraction when the hash matches.
 3. It copies the shipped defaults to the persistent config directory and reads
    user overrides.
 4. It starts the bundled Node runtime against the generated
    `scripts/orchestrator.js` payload bundle, or
-   attaches to an already-running runner on the configured port.
-5. It waits for the runner API, starts services for a normal app launch, and
+   attaches to an already-running simulator on the configured port.
+5. It waits for the simulator API, starts services for a normal app launch, and
    navigates the desktop window to the appropriate route.
-6. The native tray and window share the same runner API for start, stop, and
+6. The native tray and window share the same simulator API for start, stop, and
    navigation actions.
 
 Only the launcher-owned child process is terminated on quit. Attaching to an
-existing runner does not transfer process ownership.
+existing simulator does not transfer process ownership.
 
 ## Build Pipeline
 
@@ -57,11 +57,11 @@ The npm and full Deno packaging tasks run the same stages:
    configuration, and the target Node binary.
 7. Run the target-specific `deno desktop` compile task for either a release
    bundle or native installer.
-8. Normalize bundle output into `release/windows/runner/` or
-   `release/mac/runner.app`. Installer builds additionally emit
-   `release/windows/runner.msi` or `release/mac/runner.dmg`, then remove
+8. Normalize bundle output into `release/windows/simulator/` or
+   `release/mac/simulator.app`. Installer builds additionally emit
+   `release/windows/simulator.msi` or `release/mac/simulator.dmg`, then remove
    transient payload staging. The Windows installer flow also removes its
-   intermediate `runner/` bundle so `runner.msi` is its only release artifact.
+   intermediate `simulator/` bundle so `simulator.msi` is its only release artifact.
 
 The Windows desktop launcher uses the GUI-subsystem `nodew.exe` for its child
 orchestrator so no console window appears. The regular `node.exe` remains in the
@@ -70,7 +70,7 @@ before being copied to `release/mac/` to avoid extended-attribute issues in the
 workspace.
 
 Deno 2.9 copies the configured Windows ICO beside the launcher rather than
-embedding it. The packaging pipeline therefore finalizes `runner.exe` with the
+embedding it. The packaging pipeline therefore finalizes `simulator.exe` with the
 shared multi-resolution icon after bundle creation. Installer builds stage that
 finalized launcher as Deno's local Windows backend before MSI assembly so the
 installed executable carries the same icon resources.
@@ -84,7 +84,7 @@ step is Windows-only and requires the FFI permission included in Windows builds.
 
 - `desktop/` contains the Deno shell and checked-in image assets.
 - `scripts/` contains TypeScript orchestration, configuration, and packaging code.
-- `src/` contains the runner UI.
+- `src/` contains the simulator UI.
 - `injections/` contains TypeScript services and static assets bundled into the payload.
 - `config/` contains shipped defaults and development overrides.
 - `.tmp/`, `dist/`, and `release/` are generated and ignored.

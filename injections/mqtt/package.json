@@ -1,5 +1,5 @@
 {
-  "name": "@local-mqtt-app-runner/injection-mqtt",
+  "name": "@local-mqtt-app-simulator/injection-mqtt",
   "version": "0.1.0",
   "private": true,
   "type": "module",
