@@ -3,10 +3,11 @@ import path from "node:path";
 import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { resolveProjectRoot } from "./runtime-paths.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, "..");
+const projectRoot = resolveProjectRoot(__dirname);
 
 const taskName = process.argv[2];
 const target = process.argv[3];
@@ -50,7 +51,7 @@ const denoCommand = resolveDenoCommand();
 const denoBinaryDir = denoCommand === "deno" ? null : path.dirname(denoCommand);
 const inheritedPath = process.env.PATH ?? process.env.Path ?? "";
 const composedPath = denoBinaryDir ? `${denoBinaryDir}${path.delimiter}${inheritedPath}` : inheritedPath;
-const env = {
+const env: NodeJS.ProcessEnv = {
   ...process.env,
   PATH: composedPath,
   Path: composedPath

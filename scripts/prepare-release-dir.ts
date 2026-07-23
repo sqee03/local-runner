@@ -1,10 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveProjectRoot } from "./runtime-paths.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, "..");
+const projectRoot = resolveProjectRoot(__dirname);
 const releaseRoot = path.join(projectRoot, "release");
 const tempRoot = path.join(projectRoot, ".tmp");
 const target = process.argv[2];

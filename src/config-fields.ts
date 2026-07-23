@@ -1,4 +1,25 @@
-export const configSections = [
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+export type JsonObject = {
+  [key: string]: JsonValue | undefined;
+};
+
+export type ConfigFieldType = "checkbox" | "number" | "text";
+
+export interface ConfigField {
+  readonly path: string;
+  readonly label: string;
+  readonly type: ConfigFieldType;
+  readonly placeholder?: string;
+}
+
+export interface ConfigSection {
+  readonly title: string;
+  readonly description: string;
+  readonly fields: ReadonlyArray<ConfigField>;
+}
+
+export const configSections: ReadonlyArray<ConfigSection> = [
   {
     title: "Interfaces",
     description: "Local host binding used by the desktop app services.",
@@ -111,32 +132,56 @@ export const configSections = [
   }
 ];
 
-export function getValueAtPath(object, path) {
-  return path.split(".").reduce((current, segment) => current?.[segment], object);
+function isJsonObject(value: JsonValue | undefined): value is JsonObject {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-export function setValueAtPath(object, path, value) {
+export function getValueAtPath(object: JsonObject, path: string): JsonValue | undefined {
+  let current: JsonValue | undefined = object;
+
+  for (const segment of path.split(".")) {
+    if (!isJsonObject(current)) {
+      return undefined;
+    }
+
+    current = current[segment];
+  }
+
+  return current;
+}
+
+export function setValueAtPath(
+  object: JsonObject,
+  path: string,
+  value: JsonValue
+): JsonObject {
   const segments = path.split(".");
   const next = structuredClone(object);
   let cursor = next;
 
   for (let index = 0; index < segments.length - 1; index += 1) {
-    const segment = segments[index];
-    cursor[segment] = cursor[segment] ?? {};
-    cursor = cursor[segment];
+    const segment = segments[index] ?? "";
+    const existingValue = cursor[segment];
+    const nextCursor = isJsonObject(existingValue) ? existingValue : {};
+    cursor[segment] = nextCursor;
+    cursor = nextCursor;
   }
 
-  cursor[segments.at(-1)] = value;
+  const lastSegment = segments.at(-1);
+  if (lastSegment) {
+    cursor[lastSegment] = value;
+  }
+
   return next;
 }
 
-export function removeValueAtPath(object, path) {
+export function removeValueAtPath(object: JsonObject, path: string): JsonObject {
   const segments = path.split(".");
   const next = structuredClone(object);
 
-  function removeRecursively(target, index) {
+  function removeRecursively(target: JsonObject, index: number) {
     const segment = segments[index];
-    if (!target || typeof target !== "object") {
+    if (!segment) {
       return;
     }
 
@@ -145,7 +190,10 @@ export function removeValueAtPath(object, path) {
       return;
     }
 
-    removeRecursively(target[segment], index + 1);
+    const nextTarget = target[segment];
+    if (isJsonObject(nextTarget)) {
+      removeRecursively(nextTarget, index + 1);
+    }
 
     if (
       target[segment] &&

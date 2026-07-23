@@ -6,3 +6,4 @@ desktop/bin/
 logs/
 vendor/
 .DS_Store
+.agents

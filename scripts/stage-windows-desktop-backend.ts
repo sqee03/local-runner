@@ -1,10 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveProjectRoot } from "./runtime-paths.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, "..");
+const projectRoot = resolveProjectRoot(__dirname);
 const runnerDir = path.join(projectRoot, "release", "windows", "runner");
 const runnerPath = path.join(runnerDir, "runner.exe");
 const stagingRoot = path.join(projectRoot, ".tmp", "windows-icon-backend");

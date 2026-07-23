@@ -3,10 +3,11 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { resolveProjectRoot } from "./runtime-paths.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, "..");
+const projectRoot = resolveProjectRoot(__dirname);
 const sourceAppPath = "/tmp/runner.app";
 const destinationAppPath = path.join(projectRoot, "release", "mac", "runner.app");
 const destinationDmgPath = path.join(projectRoot, "release", "mac", "runner.dmg");

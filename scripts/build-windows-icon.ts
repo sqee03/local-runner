@@ -1,11 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveProjectRoot } from "./runtime-paths.js";
 import { encodePng, renderAppIcon } from "./icon-renderer.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, "..");
+const projectRoot = resolveProjectRoot(__dirname);
 const assetsDir = path.join(projectRoot, "desktop", "assets");
 const pngPath = path.join(assetsDir, "app-icon.png");
 const icoPath = path.join(assetsDir, "app-icon.ico");

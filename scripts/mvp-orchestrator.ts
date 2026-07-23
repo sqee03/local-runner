@@ -6,10 +6,12 @@ import { spawn } from "node:child_process";
 import { inspect } from "node:util";
 import { fileURLToPath } from "node:url";
 import { createConfigStore } from "./config-store.js";
+import { resolveProjectRoot } from "./runtime-paths.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, "..");
+const runtimeRoot = path.resolve(__dirname, "..");
+const projectRoot = resolveProjectRoot(__dirname);
 const distDir = path.join(projectRoot, "dist");
 const logDir = process.env.PACKAGE_RUNNER_LOG_DIR
   ? path.resolve(process.env.PACKAGE_RUNNER_LOG_DIR)
@@ -240,7 +242,7 @@ function waitForHttpReady(url, timeoutMs = 15000) {
     function attempt() {
       const request = http.get(url, (response) => {
         response.resume();
-        resolve();
+        resolve(undefined);
       });
 
       request.on("error", () => {
@@ -262,7 +264,7 @@ function canBindPort(host, port) {
     const server = net.createServer();
 
     server.once("error", (error) => {
-      if (error.code === "EADDRINUSE") {
+      if ((error as NodeJS.ErrnoException).code === "EADDRINUSE") {
         resolve(false);
         return;
       }
@@ -333,6 +335,14 @@ function buildPackageRuntimeConfig(configSnapshot) {
   const effective = configSnapshot.effective;
   const host = effective.interfaces.host;
   const ports = effective.ports;
+  const resolveRuntimeEntry = (entryPath) => {
+    const projectEntryPath = path.resolve(projectRoot, entryPath);
+    if (fs.existsSync(projectEntryPath)) {
+      return projectEntryPath;
+    }
+
+    return path.resolve(runtimeRoot, entryPath);
+  };
 
   return {
     host,
@@ -344,7 +354,7 @@ function buildPackageRuntimeConfig(configSnapshot) {
           effective.paths.mqttExecutable === "node"
             ? process.execPath
             : effective.paths.mqttExecutable,
-        entry: path.resolve(projectRoot, effective.paths.mqttEntry),
+        entry: resolveRuntimeEntry(effective.paths.mqttEntry),
         cwd: path.resolve(projectRoot, effective.paths.mqttWorkingDirectory),
         env: {
           ...process.env,
@@ -358,7 +368,7 @@ function buildPackageRuntimeConfig(configSnapshot) {
           effective.paths.backendExecutable === "node"
             ? process.execPath
             : effective.paths.backendExecutable,
-        entry: path.resolve(projectRoot, effective.paths.backendEntry),
+        entry: resolveRuntimeEntry(effective.paths.backendEntry),
         cwd: path.resolve(projectRoot, effective.paths.backendWorkingDirectory),
         env: {
           ...process.env,
@@ -371,7 +381,7 @@ function buildPackageRuntimeConfig(configSnapshot) {
           effective.paths.frontendExecutable === "node"
             ? process.execPath
             : effective.paths.frontendExecutable,
-        entry: path.resolve(projectRoot, effective.paths.frontendEntry),
+        entry: resolveRuntimeEntry(effective.paths.frontendEntry),
         cwd: path.resolve(projectRoot, effective.paths.frontendWorkingDirectory),
         env: {
           ...process.env,
@@ -554,7 +564,8 @@ function createStaticServer() {
     if (rawPath === "/api/config" && req.method === "POST") {
       parseJsonBody(req)
         .then((body) => {
-          const nextOverrides = body.userOverrides ?? body;
+          const requestBody = body && typeof body === "object" ? body : {};
+          const nextOverrides = "userOverrides" in requestBody ? requestBody.userOverrides : requestBody;
           const nextConfig = configStore.writeUserOverrides(nextOverrides);
           sendJson(res, 200, normalizeConfigForClient(nextConfig));
         })
@@ -617,7 +628,7 @@ async function main() {
   const staticServer = createStaticServer();
   await new Promise((resolve, reject) => {
     staticServer.once("error", reject);
-    staticServer.listen(runnerPort, host, resolve);
+    staticServer.listen(runnerPort, host, () => resolve(undefined));
   });
 
   const shutdown = async () => {

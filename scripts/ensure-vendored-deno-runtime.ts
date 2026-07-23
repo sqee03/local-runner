@@ -3,10 +3,11 @@ import path from "node:path";
 import https from "node:https";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { resolveProjectRoot } from "./runtime-paths.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, "..");
+const projectRoot = resolveProjectRoot(__dirname);
 
 const denoVersion = "v2.9.2";
 const target = process.argv[2];
@@ -37,7 +38,7 @@ function ensureCommand(commandName) {
     stdio: "ignore"
   });
 
-  if (result.error && result.error.code === "ENOENT") {
+  if (result.error && (result.error as NodeJS.ErrnoException).code === "ENOENT") {
     throw new Error(`Required command "${commandName}" is not available on PATH.`);
   }
 }
@@ -48,7 +49,7 @@ function getAvailablePowerShell() {
       stdio: "ignore"
     });
 
-    if (!result.error || result.error.code !== "ENOENT") {
+    if (!result.error || (result.error as NodeJS.ErrnoException).code !== "ENOENT") {
       return commandName;
     }
   }

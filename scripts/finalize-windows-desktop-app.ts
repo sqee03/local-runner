@@ -1,12 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveProjectRoot } from "./runtime-paths.js";
 import * as PELibrary from "pe-library";
 import * as ResEdit from "resedit";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, "..");
+const projectRoot = resolveProjectRoot(__dirname);
 const runnerPath = path.join(projectRoot, "release", "windows", "runner", "runner.exe");
 const iconPath = path.join(projectRoot, "desktop", "assets", "app-icon.ico");
 const temporaryRunnerPath = `${runnerPath}.with-icon`;

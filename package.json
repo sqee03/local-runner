@@ -4,19 +4,21 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build:node": "tsc --project tsconfig.node.json && node .tmp/node-runtime/scripts/copy-runtime-assets.js",
+    "typecheck": "tsc --project tsconfig.json --noEmit && tsc --project tsconfig.node.json --noEmit",
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run typecheck && vite build",
     "preview": "vite preview",
-    "runner": "npm run build && node scripts/mvp-orchestrator.js",
+    "runner": "npm run build && npm run build:node && node .tmp/node-runtime/scripts/mvp-orchestrator.js",
     "package:windows": "npm run package:windows:bundle",
-    "package:windows:prepare": "npm run build && node scripts/build-windows-icon.js && node scripts/prepare-release-dir.js windows && node scripts/ensure-vendored-node-runtime.js windows && node scripts/ensure-vendored-deno-runtime.js windows && node scripts/prepare-packaged-runtime.js && node scripts/create-deno-payload.js windows",
-    "package:windows:bundle": "npm run package:windows:prepare && node scripts/run-deno-task.js compile:windows:bundle windows && node scripts/finalize-windows-desktop-app.js && node scripts/finalize-release-dir.js",
-    "package:windows:installer": "npm run package:windows:prepare && node scripts/run-deno-task.js compile:windows:bundle windows && node scripts/finalize-windows-desktop-app.js && node scripts/stage-windows-desktop-backend.js && node scripts/run-deno-task.js compile:windows:installer windows && node scripts/finalize-release-dir.js --remove-windows-bundle",
+    "package:windows:prepare": "npm run build && npm run build:node && node .tmp/node-runtime/scripts/build-windows-icon.js && node .tmp/node-runtime/scripts/prepare-release-dir.js windows && node .tmp/node-runtime/scripts/ensure-vendored-node-runtime.js windows && node .tmp/node-runtime/scripts/ensure-vendored-deno-runtime.js windows && node .tmp/node-runtime/scripts/prepare-packaged-runtime.js && node .tmp/node-runtime/scripts/create-deno-payload.js windows",
+    "package:windows:bundle": "npm run package:windows:prepare && node .tmp/node-runtime/scripts/run-deno-task.js compile:windows:bundle windows && node .tmp/node-runtime/scripts/finalize-windows-desktop-app.js && node .tmp/node-runtime/scripts/finalize-release-dir.js",
+    "package:windows:installer": "npm run package:windows:prepare && node .tmp/node-runtime/scripts/run-deno-task.js compile:windows:bundle windows && node .tmp/node-runtime/scripts/finalize-windows-desktop-app.js && node .tmp/node-runtime/scripts/stage-windows-desktop-backend.js && node .tmp/node-runtime/scripts/run-deno-task.js compile:windows:installer windows && node .tmp/node-runtime/scripts/finalize-release-dir.js --remove-windows-bundle",
     "package:windows:gui": "npm run package:windows:bundle",
     "package:mac:arm": "npm run package:mac:arm:bundle",
-    "package:mac:arm:prepare": "npm run build && node scripts/build-macos-icon.js && node scripts/prepare-release-dir.js mac-arm64 && node scripts/ensure-vendored-node-runtime.js mac-arm64 && node scripts/ensure-vendored-deno-runtime.js mac-arm64 && node scripts/prepare-packaged-runtime.js && node scripts/create-deno-payload.js mac-arm64",
-    "package:mac:arm:bundle": "npm run package:mac:arm:prepare && node scripts/run-deno-task.js compile:mac:arm:bundle mac-arm64 && node scripts/finalize-macos-desktop-app.js && node scripts/finalize-release-dir.js",
-    "package:mac:arm:installer": "npm run package:mac:arm:prepare && node scripts/run-deno-task.js compile:mac:arm:installer mac-arm64 && node scripts/finalize-macos-desktop-app.js --dmg && node scripts/finalize-release-dir.js"
+    "package:mac:arm:prepare": "npm run build && npm run build:node && node .tmp/node-runtime/scripts/build-macos-icon.js && node .tmp/node-runtime/scripts/prepare-release-dir.js mac-arm64 && node .tmp/node-runtime/scripts/ensure-vendored-node-runtime.js mac-arm64 && node .tmp/node-runtime/scripts/ensure-vendored-deno-runtime.js mac-arm64 && node .tmp/node-runtime/scripts/prepare-packaged-runtime.js && node .tmp/node-runtime/scripts/create-deno-payload.js mac-arm64",
+    "package:mac:arm:bundle": "npm run package:mac:arm:prepare && node .tmp/node-runtime/scripts/run-deno-task.js compile:mac:arm:bundle mac-arm64 && node .tmp/node-runtime/scripts/finalize-macos-desktop-app.js && node .tmp/node-runtime/scripts/finalize-release-dir.js",
+    "package:mac:arm:installer": "npm run package:mac:arm:prepare && node .tmp/node-runtime/scripts/run-deno-task.js compile:mac:arm:installer mac-arm64 && node .tmp/node-runtime/scripts/finalize-macos-desktop-app.js --dmg && node .tmp/node-runtime/scripts/finalize-release-dir.js"
   },
   "dependencies": {
     "aedes": "^0.51.3",
@@ -27,10 +29,14 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^5.0.0",
     "esbuild": "^0.28.1",
     "pe-library": "^2.0.1",
     "resedit": "^3.0.2",
+    "typescript": "^5.8.3",
     "vite": "^7.0.0"
   }
 }

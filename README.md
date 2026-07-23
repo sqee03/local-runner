@@ -125,9 +125,10 @@ Packaging stores downloaded build tools and intermediate payloads under `.tmp/`.
 Generated application artifacts are written under `release/`; both directories
 are intentionally ignored by Git.
 
-The packaging pipeline bundles and minifies the runner, frontend server,
-backend, MQTT broker, and injected browser script with esbuild. Original source
-files remain unchanged in `scripts/` and `injections/` for development. Bundling
+The packaging pipeline typechecks the TypeScript sources, then bundles and
+minifies the runner, frontend server, backend, MQTT broker, and injected browser
+script with esbuild. Original source files remain unchanged in `scripts/` and
+`injections/` for development. Bundling
 reduces casual source exposure but should not be treated as encryption or as
 protection against determined reverse engineering.
 
@@ -148,12 +149,13 @@ layout.
 
 ## Asset Maintenance
 
-The shared tray/app symbol geometry lives in `scripts/icon-renderer.js`.
+The shared tray/app symbol geometry lives in `scripts/icon-renderer.ts`.
 Windows packaging generates a matching 512px app PNG and a multi-resolution
 ICO, then embeds all ICO sizes directly into `runner.exe`. macOS packaging uses
 the generated app PNG to build its ICNS container. Tray assets are checked in
 and can be regenerated with:
 
 ```bash
-node scripts/build-tray-icons.js
+npm run build:node
+node .tmp/node-runtime/scripts/build-tray-icons.js
 ```

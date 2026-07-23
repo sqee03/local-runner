@@ -4,8 +4,9 @@
 
 The project has two shells around the same Node service orchestrator:
 
-- `npm run runner` starts `scripts/mvp-orchestrator.js` directly and opens the
-  runner UI in a browser.
+- `npm run runner` builds the TypeScript runtime into `.tmp/node-runtime/`,
+  starts `.tmp/node-runtime/scripts/mvp-orchestrator.js`, and opens the runner
+  UI in a browser.
 - A packaged app starts `desktop/main.ts` as a Deno desktop shell. The shell
   extracts its embedded payload, starts the same orchestrator with the bundled
   Node runtime, and presents the runner routes in a native window.
@@ -14,7 +15,7 @@ The orchestrator owns four localhost-only components:
 
 | Component | Source | Responsibility |
 | --- | --- | --- |
-| Runner | `scripts/mvp-orchestrator.js` | Serves the control UI and runtime/config APIs |
+| Runner | `scripts/mvp-orchestrator.ts` | Serves the control UI and runtime/config APIs |
 | Frontend | `injections/fe/` | Serves the injected simulator frontend |
 | Backend | `injections/be/` | Publishes test data to MQTT |
 | MQTT | `injections/mqtt/` | Provides TCP and WebSocket MQTT endpoints |
@@ -30,7 +31,7 @@ desktop routes `/desktop/simulator` and `/desktop/config`.
 3. It copies the shipped defaults to the persistent config directory and reads
    user overrides.
 4. It starts the bundled Node runtime against the generated
-   `scripts/mvp-orchestrator.js` bundle, or
+   `scripts/mvp-orchestrator.js` payload bundle, or
    attaches to an already-running runner on the configured port.
 5. It waits for the runner API, starts services for a normal app launch, and
    navigates the desktop window to the appropriate route.
@@ -44,8 +45,10 @@ existing runner does not transfer process ownership.
 
 The npm and full Deno packaging tasks run the same stages:
 
-1. Build the Vite application.
-2. Generate the target app icon.
+1. Typecheck the TypeScript UI and Node runtime sources, then build the Vite
+   application.
+2. Compile the Node runtime TypeScript sources into `.tmp/node-runtime/` and
+   generate the target app icon.
 3. Prepare the target release directory.
 4. Cache the target Node and Deno build tools under `.tmp/build-tools/`.
 5. Bundle and minify the Node entrypoints and injected browser assets into
@@ -80,9 +83,9 @@ step is Windows-only and requires the FFI permission included in Windows builds.
 ## Repository Boundaries
 
 - `desktop/` contains the Deno shell and checked-in image assets.
-- `scripts/` contains orchestration, configuration, and packaging code.
+- `scripts/` contains TypeScript orchestration, configuration, and packaging code.
 - `src/` contains the runner UI.
-- `injections/` contains the services bundled into the payload.
+- `injections/` contains TypeScript services and static assets bundled into the payload.
 - `config/` contains shipped defaults and development overrides.
 - `.tmp/`, `dist/`, and `release/` are generated and ignored.
 

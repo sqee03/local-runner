@@ -2,16 +2,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { resolveProjectRoot } from "./runtime-paths.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, "..");
+const projectRoot = resolveProjectRoot(__dirname);
 const assetsDir = path.join(projectRoot, "desktop", "assets");
 const sourcePngPath = path.join(assetsDir, "app-icon.png");
 const outputIcnsPath = path.join(assetsDir, "app-icon.icns");
 const iconsetPath = path.join(projectRoot, ".tmp", "app-icon.iconset");
 
-const iconEntries = [
+const iconEntries: ReadonlyArray<readonly [string, string, number]> = [
   ["icp4", "icon_16x16.png", 16],
   ["icp5", "icon_32x32.png", 32],
   ["icp6", "icon_64x64.png", 64],
@@ -26,7 +27,7 @@ function ensureCommand(commandName) {
     stdio: "ignore"
   });
 
-  if (result.error && result.error.code === "ENOENT") {
+  if (result.error && (result.error as NodeJS.ErrnoException).code === "ENOENT") {
     throw new Error(`Required command "${commandName}" is not available on PATH.`);
   }
 }
@@ -59,7 +60,7 @@ function main() {
   });
   fs.mkdirSync(iconsetPath, { recursive: true });
 
-  const iconChunks = [];
+  const iconChunks: Buffer[] = [];
   for (const [type, fileName, size] of iconEntries) {
     resizePng(path.join(iconsetPath, fileName), size);
     const png = fs.readFileSync(path.join(iconsetPath, fileName));

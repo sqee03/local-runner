@@ -1,18 +1,19 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveProjectRoot } from "./runtime-paths.js";
 import { build } from "esbuild";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, "..");
+const projectRoot = resolveProjectRoot(__dirname);
 const stagingRoot = path.join(projectRoot, ".tmp", "packaged-runtime");
 
 const nodeBundles = [
-  ["scripts/mvp-orchestrator.js", "scripts/mvp-orchestrator.js"],
-  ["injections/fe/server.js", "injections/fe/server.js"],
-  ["injections/be/server.js", "injections/be/server.js"],
-  ["injections/mqtt/server.js", "injections/mqtt/server.js"]
+  ["scripts/mvp-orchestrator.ts", "scripts/mvp-orchestrator.js"],
+  ["injections/fe/server.ts", "injections/fe/server.js"],
+  ["injections/be/server.ts", "injections/be/server.js"],
+  ["injections/mqtt/server.ts", "injections/mqtt/server.js"]
 ];
 
 function resolve(relativePath) {
@@ -63,7 +64,7 @@ async function bundleFrontendAssets() {
 
   await Promise.all([
     build({
-      entryPoints: [resolve("injections/fe/app.js")],
+      entryPoints: [resolve("injections/fe/app.ts")],
       outfile: path.join(frontendDir, "app.js"),
       bundle: true,
       minify: true,

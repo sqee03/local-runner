@@ -1,13 +1,48 @@
-import { useEffect, useRef, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import appVersionInfo from "../version.json";
 import {
+  type ConfigFieldType,
+  type JsonObject,
+  type JsonValue,
   configSections,
   getValueAtPath,
   removeValueAtPath,
   setValueAtPath
 } from "./config-fields";
 
-function resolvePage(pathname) {
+type Page = "config" | "desktop-config" | "desktop-simulator" | "home";
+type SaveState = "idle" | "saved" | "saving" | string;
+type CopyState = "copied" | "failed" | "idle";
+type PackageName = "be" | "fe" | "mqtt";
+type PackageStatus = "running" | "starting" | "stopped" | "stopping";
+
+interface ConfigResponse {
+  readonly defaults: JsonObject;
+  readonly userOverrides: JsonObject;
+  readonly effective: JsonObject;
+  readonly filePaths?: {
+    readonly defaultConfig?: string;
+    readonly userConfig?: string;
+  };
+}
+
+interface RuntimeConfig extends JsonObject {
+  readonly frontendAppUrl?: string;
+}
+
+interface RuntimeState {
+  readonly isRunning: boolean;
+  readonly isTransitioning: boolean;
+  readonly lastError: string | null;
+  readonly currentConfig: RuntimeConfig | null;
+  readonly packageStatus: Partial<Record<PackageName, PackageStatus>>;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function resolvePage(pathname: string): Page {
   if (pathname.startsWith("/desktop/config")) {
     return "desktop-config";
   }
@@ -23,7 +58,7 @@ function resolvePage(pathname) {
   return "home";
 }
 
-function resolveDocumentTitle(page, appVersion) {
+function resolveDocumentTitle(page: Page, appVersion: string): string {
   if (page === "config" || page === "desktop-config") {
     return `v${appVersion} - Config`;
   }
@@ -37,18 +72,20 @@ function resolveDocumentTitle(page, appVersion) {
 
 function App() {
   const appVersion = appVersionInfo.version;
-  const frontendWindowRef = useRef(null);
+  const frontendWindowRef = useRef<Window | null>(null);
   const [page, setPage] = useState(() => resolvePage(window.location.pathname));
-  const [configData, setConfigData] = useState(null);
-  const [formState, setFormState] = useState(null);
+  const [configData, setConfigData] = useState<ConfigResponse | null>(null);
+  const [formState, setFormState] = useState<JsonObject | null>(null);
   const [configStatus, setConfigStatus] = useState("Loading configuration...");
-  const [saveState, setSaveState] = useState("idle");
-  const [runtimeState, setRuntimeState] = useState({
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [runtimeState, setRuntimeState] = useState<RuntimeState>({
     isRunning: false,
     isTransitioning: false,
-    lastError: null
+    lastError: null,
+    currentConfig: null,
+    packageStatus: {}
   });
-  const [copyState, setCopyState] = useState("idle");
+  const [copyState, setCopyState] = useState<CopyState>("idle");
 
   const isDesktopShell = page.startsWith("desktop-");
   const isConfigPage = page === "config" || page === "desktop-config";
@@ -81,7 +118,7 @@ function App() {
         setFormState(payload.userOverrides);
         setConfigStatus("Configuration loaded.");
       } catch (error) {
-        setConfigStatus(error.message);
+        setConfigStatus(errorMessage(error));
       }
     }
 
@@ -102,7 +139,7 @@ function App() {
       } catch (error) {
         setRuntimeState((current) => ({
           ...current,
-          lastError: error.message
+          lastError: errorMessage(error)
         }));
       }
     }
@@ -112,13 +149,13 @@ function App() {
     return () => window.clearInterval(timer);
   }, []);
 
-  function tryOpenFrontend(url) {
+  function tryOpenFrontend(url: string): Window | null {
     const openedWindow = window.open(url, "package-runner-fe");
     frontendWindowRef.current = openedWindow;
     return openedWindow;
   }
 
-  function navigate(nextPage) {
+  function navigate(nextPage: Page) {
     const nextPath =
       nextPage === "config"
         ? "/config"
@@ -132,29 +169,33 @@ function App() {
     setPage(nextPage);
   }
 
-  function handleFieldChange(path, rawValue, type) {
+  function handleFieldChange(path: string, rawValue: JsonValue, type: ConfigFieldType) {
     if (!formState) {
       return;
     }
 
     if (type === "checkbox") {
-      setFormState((current) => setValueAtPath(current, path, rawValue));
+      setFormState((current) =>
+        current ? setValueAtPath(current, path, rawValue) : current
+      );
       setSaveState("idle");
       return;
     }
 
     if (rawValue === "") {
-      setFormState((current) => removeValueAtPath(current, path));
+      setFormState((current) => (current ? removeValueAtPath(current, path) : current));
       setSaveState("idle");
       return;
     }
 
     const parsedValue = type === "number" ? Number(rawValue) : rawValue;
-    setFormState((current) => setValueAtPath(current, path, parsedValue));
+    setFormState((current) =>
+      current ? setValueAtPath(current, path, parsedValue) : current
+    );
     setSaveState("idle");
   }
 
-  async function saveConfig(event) {
+  async function saveConfig(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaveState("saving");
 
@@ -176,7 +217,7 @@ function App() {
       setFormState(payload.userOverrides);
       setSaveState("saved");
     } catch (error) {
-      setSaveState(error.message);
+      setSaveState(errorMessage(error));
     }
   }
 
@@ -214,7 +255,7 @@ function App() {
     } catch (error) {
       setRuntimeState((current) => ({
         ...current,
-        lastError: error.message
+        lastError: errorMessage(error)
       }));
     }
   }
@@ -288,17 +329,6 @@ function App() {
                       configData?.effective ?? {},
                       field.path
                     );
-                    const inputValue =
-                      field.type === "checkbox"
-                        ? Boolean(
-                            overrideValue === undefined
-                              ? effectiveValue
-                              : overrideValue
-                          )
-                        : overrideValue === undefined
-                          ? ""
-                          : String(overrideValue);
-
                     return (
                       <label className="field-card" key={field.path}>
                         <span>{field.label}</span>
@@ -306,7 +336,9 @@ function App() {
                           <input
                             className="toggle-input"
                             type="checkbox"
-                            checked={inputValue}
+                            checked={Boolean(
+                              overrideValue === undefined ? effectiveValue : overrideValue
+                            )}
                             onChange={(event) =>
                               handleFieldChange(
                                 field.path,
@@ -318,7 +350,9 @@ function App() {
                         ) : (
                           <input
                             type={field.type}
-                            value={inputValue}
+                            value={
+                              overrideValue === undefined ? "" : String(overrideValue)
+                            }
                             placeholder={field.placeholder ?? String(effectiveValue ?? "")}
                             onChange={(event) =>
                               handleFieldChange(
